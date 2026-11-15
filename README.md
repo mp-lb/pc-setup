@@ -1,7 +1,8 @@
-# Macsetup
+# PC setup
 
-Macsetup is the MAP Lab host bootstrapper for programming Macs. It owns the
-small layer below project development:
+PC setup is the MAP Lab development-machine bootstrapper. The current scripts
+support macOS; Linux and Windows setup can be added later. It owns the small
+layer below project development:
 
 - Homebrew and Homebrew-managed host tools
 - mise for runtime/tool versions
@@ -18,18 +19,18 @@ It does not directly manage Node, Python, or Ruby with `nvm`, `pyenv`, or
 ## Install
 
 ```
-/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/macsetup/main/start.sh)"
+/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/start.sh)"
 ```
 
-The install script assumes you're running it as the admin user on the machine. If the repository already exists at `~/Work/macsetup`, the script will reuse it instead of cloning again.
+The install script assumes you're running it as the admin user on the machine. If the repository already exists at `~/Work/pc-setup`, the script will reuse it instead of cloning again.
 
-Set `MACSETUP_WORKSPACE` to use a different Work folder, and optionally
-`MACSETUP_REPO_PATH` to place this checkout elsewhere. Both paths are saved in the
+Set `PC_SETUP_WORKSPACE` to use a different Work folder, and optionally
+`PC_SETUP_REPO_PATH` to place this checkout elsewhere. Both paths are saved in the
 shell bridge for future terminals. For example:
 
 ```sh
-export MACSETUP_WORKSPACE="$HOME/Development"
-/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/macsetup/main/start.sh)"
+export PC_SETUP_WORKSPACE="$HOME/Development"
+/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/start.sh)"
 ```
 
 Setup installs Claude Code through Homebrew and records trust for the resolved
@@ -46,45 +47,45 @@ the production `@mp-lb/berth` package, never a development checkout link.
 ## Doctor
 
 ```
-~/Work/macsetup/doctor.sh
+~/Work/pc-setup/doctor.sh
 ```
 
 ## Inventory
 
 ```
-~/Work/macsetup/inventory.sh
+~/Work/pc-setup/inventory.sh
 ```
 
-## Optional Apps
+## Optional apps
 
 Large app/cask installs are intentionally outside the default bootstrap path.
 Install them when needed:
 
 ```
-brew bundle --file ~/Work/macsetup/Brewfile.apps
+brew bundle --file ~/Work/pc-setup/Brewfile.apps
 ```
 
-## Agent Skills
+## Agent skills
 
 Global agent skills are declared in `config/global-skills.txt` and installed for Codex
 and Claude Code:
 
 ```
-~/Work/macsetup/bin/install-skills
+~/Work/pc-setup/bin/install-skills
 ```
 
-## Uninstall Legacy Runtime State
+## Uninstall legacy runtime state
 
 ```
-~/Work/macsetup/uninstall.sh
+~/Work/pc-setup/uninstall.sh
 ```
 
-This removes legacy macsetup-managed runtime directories such as `~/.nvm`,
+This removes legacy pc-setup-managed runtime directories such as `~/.nvm`,
 `~/.pyenv`, `~/.rbenv`, and the old `~/google-cloud-sdk` installer. It does not
 delete `~/Work`, Homebrew, git config, gh auth, or project files.
 
 To also clear mise-managed runtime state:
 
 ```
-~/Work/macsetup/uninstall.sh --all
+~/Work/pc-setup/uninstall.sh --all
 ```

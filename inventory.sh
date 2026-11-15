@@ -23,7 +23,7 @@ print_version() {
   fi
 }
 
-echo "macsetup inventory"
+echo "pc-setup inventory"
 echo
 print_version "brew" brew --version
 print_version "gh" gh --version
@@ -52,7 +52,7 @@ fi
 echo
 echo "homebrew bundle"
 if command -v brew >/dev/null 2>&1; then
-  brew bundle check --file "$MACSETUP_REPO_PATH/Brewfile" || true
+  brew bundle check --file "$PC_SETUP_REPO_PATH/Brewfile" || true
 else
   echo "brew missing"
 fi

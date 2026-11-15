@@ -79,7 +79,7 @@ check_command "tree" tree --version
 check_recommended_command "OrbStack/Docker" docker --version
 
 log "Checking Claude Code workspace trust."
-if node "$SCRIPT_DIR/lib/claude-trust.mjs" "$MACSETUP_WORKSPACE" --check; then
+if node "$SCRIPT_DIR/lib/claude-trust.mjs" "$PC_SETUP_WORKSPACE" --check; then
   success "Claude Code: workspace is trusted"
 else
   error "Claude Code: workspace trust is missing or unreadable; rerun start.sh"
@@ -100,17 +100,17 @@ check_absent_dir "pyenv" "$HOME/.pyenv"
 check_absent_dir "rbenv" "$HOME/.rbenv"
 check_absent_dir "old gcloud installer" "$HOME/google-cloud-sdk"
 
-if [ -f "$HOME/.zshrc" ] && grep -q 'MACSETUP_REPO_PATH/env/zshrc' "$HOME/.zshrc"; then
-  success "Shell bridge: ~/.zshrc sources macsetup"
+if [ -f "$HOME/.zshrc" ] && grep -q 'PC_SETUP_REPO_PATH/env/zshrc' "$HOME/.zshrc"; then
+  success "Shell bridge: ~/.zshrc sources pc-setup"
 else
-  error "Shell bridge: ~/.zshrc does not source macsetup"
+  error "Shell bridge: ~/.zshrc does not source pc-setup"
   failures=$((failures + 1))
 fi
 
 if [ -f "$HOME/.aws/config" ] && cmp -s "$SCRIPT_DIR/env/aws-config" "$HOME/.aws/config"; then
-  success "AWS config: ~/.aws/config matches macsetup"
+  success "AWS config: ~/.aws/config matches pc-setup"
 else
-  error "AWS config: ~/.aws/config does not match macsetup"
+  error "AWS config: ~/.aws/config does not match pc-setup"
   failures=$((failures + 1))
 fi
 

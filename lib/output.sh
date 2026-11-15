@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-OUTPUT_TAG="[macsetup]"
+OUTPUT_TAG="[pc-setup]"
 
 log() {
   echo "🔧 $OUTPUT_TAG $1"

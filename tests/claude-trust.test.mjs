@@ -9,7 +9,7 @@ import { test } from 'node:test';
 const script = fileURLToPath(new URL('../lib/claude-trust.mjs', import.meta.url));
 
 function fixture(t, customConfig = false) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'macsetup-trust-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-setup-trust-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const workspace = path.join(home, 'Work with spaces');
   fs.mkdirSync(workspace);

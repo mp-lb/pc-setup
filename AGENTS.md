@@ -1,10 +1,11 @@
-# Macsetup
+# PC setup
 
-This repository bootstraps MAP Lab programming Macs.
+This repository bootstraps MAP Lab development machines. The current scripts
+support macOS; Linux and Windows support is not implemented yet.
 
 ## Boundary
 
-Macsetup owns only the host substrate:
+PC setup owns only the host substrate:
 
 - Homebrew and Homebrew-managed CLI tools
 - mise installation and global default tools
@@ -14,7 +15,7 @@ Macsetup owns only the host substrate:
 - the shell bridge that activates mise and adds MAP Lab helper scripts to PATH
 - doctor/inventory scripts for checking local machine state
 
-Macsetup does not directly install language runtimes with `nvm`, `pyenv`, or
+PC setup does not directly install language runtimes with `nvm`, `pyenv`, or
 `rbenv`. Runtime versions belong to mise. Project services, ports, env files,
 and tasks belong to Zapper.
 
@@ -25,7 +26,7 @@ and tasks belong to Zapper.
 - `Brewfile.cloud` is optional cloud CLI installs.
 - `start.sh` is the bootstrap entrypoint and must remain runnable from the
   GitHub raw URL.
-- `uninstall.sh` removes legacy macsetup-managed runtime state only; it must
+- `uninstall.sh` removes legacy pc-setup-managed runtime state only; it must
   never delete `~/Work`, project files, git config, or Homebrew.
 - `doctor.sh` checks whether the required host substrate is healthy.
 - `inventory.sh` prints what is installed.
@@ -56,6 +57,6 @@ brew bundle check --file ./Brewfile
 
 ## Documentation
 
-Keep Macsetup-specific documents under `docs/` when needed. This repository has no dedicated Forum store or sync configuration.
+Keep PC setup-specific documents under `docs/` when needed. This repository has no dedicated Forum store or sync configuration.
 
 Read shared standards with `fm read <file>.md --store mp-lb/dev` (list them with `fm ls --store mp-lb/dev`). Read shared extensions with `fm read extensions/<extension>/README.md --store mp-lb/fssstack` (list them with `fm ls extensions --store mp-lb/fssstack`).

@@ -2,22 +2,22 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/paths.sh"
-source "$MACSETUP_REPO_PATH/lib/output.sh"
+source "$PC_SETUP_REPO_PATH/lib/output.sh"
 
 # Create archive directory if it doesn't exist
-ARCHIVE_DIR="$MACSETUP_WORKSPACE/_archive"
+ARCHIVE_DIR="$PC_SETUP_WORKSPACE/_archive"
 mkdir -p "$ARCHIVE_DIR"
 
 # Check if any arguments were provided
 if [ $# -eq 0 ]; then
     echo "Usage: parchive <folder1> [folder2] [folder3] ..."
-    echo "Moves folders from $MACSETUP_WORKSPACE to $ARCHIVE_DIR"
+    echo "Moves folders from $PC_SETUP_WORKSPACE to $ARCHIVE_DIR"
     exit 1
 fi
 
 # Process each argument
 for folder in "$@"; do
-    SOURCE_PATH="$MACSETUP_WORKSPACE/$folder"
+    SOURCE_PATH="$PC_SETUP_WORKSPACE/$folder"
     DEST_PATH="$ARCHIVE_DIR/$folder"
     
     if [ -d "$SOURCE_PATH" ]; then
@@ -25,7 +25,7 @@ for folder in "$@"; do
         mv "$SOURCE_PATH" "$DEST_PATH"
         success "Moved $folder."
     else
-        error "Folder '$folder' not found in $MACSETUP_WORKSPACE."
+        error "Folder '$folder' not found in $PC_SETUP_WORKSPACE."
     fi
 done
 
