@@ -1,15 +1,14 @@
 # PC setup
 
-This repository bootstraps MAP Lab development machines. The current scripts
-support macOS; Linux and Windows support is not implemented yet.
+This repository bootstraps MAP Lab development machines. The scripts support macOS and Ubuntu.
 
 ## Boundary
 
 PC setup owns only the host substrate:
 
-- Homebrew and Homebrew-managed CLI tools
+- OS package managers and host CLI tools
 - mise installation and global default tools
-- Claude Code installation and workspace trust
+- Claude Code installation
 - the Forum, production Berth, and Zapper CLI installs
 - GitHub authentication and Git credential helper setup
 - the shell bridge that activates mise and adds MAP Lab helper scripts to PATH
@@ -21,9 +20,9 @@ and tasks belong to Zapper.
 
 ## Structure
 
-- `Brewfile` is the required host-tool declaration.
-- `Brewfile.apps` is optional large app/cask installs.
-- `Brewfile.cloud` is optional cloud CLI installs.
+- `os/macos/` holds the macOS recipe and Homebrew manifests.
+- `os/ubuntu/` holds the Ubuntu recipe and apt package list.
+- Keep OS-specific install steps in their OS directory.
 - `start.sh` is the bootstrap entrypoint and must remain runnable from the
   GitHub raw URL.
 - `uninstall.sh` removes legacy pc-setup-managed runtime state only; it must
@@ -40,20 +39,24 @@ layers.
 
 When adding a tool:
 
-1. Put required host CLI tools in `Brewfile`.
-2. Put optional heavy apps in `Brewfile.apps`.
-3. Put optional cloud CLIs in `Brewfile.cloud`.
-4. Put language/runtime/tool versions in mise, not shell scripts.
-5. Add or update doctor/inventory checks when useful.
+1. Put required host CLI tools in the OS package list or recipe.
+2. Keep optional heavy apps outside the default bootstrap.
+3. Use mise for language and runtime versions.
+4. Add or update doctor and inventory checks when useful.
 
 Before finishing, run:
 
 ```bash
-zsh -n start.sh uninstall.sh doctor.sh inventory.sh env/zshrc env/home-zshrc
-node --test tests/*.test.mjs
-brew bundle check --file ./Brewfile
+for file in *.sh bin/* lib/*.sh os/*/*.sh env/bashrc; do
+  bash -n "$file" || exit
+done
+for file in env/zshrc env/home-zshrc env/zsh-theme.sh; do
+  zsh -n "$file" || exit
+done
 ./doctor.sh
 ```
+
+Check the Homebrew bundle on macOS with `brew bundle check --file os/macos/Brewfile`.
 
 ## Documentation
 

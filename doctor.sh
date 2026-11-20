@@ -1,8 +1,8 @@
-#!/bin/zsh
+#!/bin/bash
 
 set -e
 
-SCRIPT_DIR="${0:A:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/output.sh"
 source "$SCRIPT_DIR/lib/paths.sh"
 
@@ -56,14 +56,14 @@ check_recommended_command() {
   fi
 }
 
-export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
 
 if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
+  PATH="$(mise exec -- printenv PATH)"
+  export PATH
 fi
 
 log "Checking host tools."
-check_command "Homebrew" brew
 check_command "GitHub CLI" gh
 check_command "mise" mise
 check_command "Node" node --version
@@ -74,16 +74,14 @@ check_command "Berth" berth --version
 check_command "Zapper" zap --version
 check_command "Clerk CLI" clerk --version
 check_command "AWS CLI" aws --version
-check_command "Google Cloud CLI" gcloud
+check_command "Overmind" overmind --version
+check_command "Go Task" task --version
+check_command "lsof" lsof
 check_command "tree" tree --version
-check_recommended_command "OrbStack/Docker" docker --version
-
-log "Checking Claude Code workspace trust."
-if node "$SCRIPT_DIR/lib/claude-trust.mjs" "$PC_SETUP_WORKSPACE" --check; then
-  success "Claude Code: workspace is trusted"
+if [[ "$OSTYPE" == darwin* ]]; then
+  source "$SCRIPT_DIR/os/macos/doctor.sh"
 else
-  error "Claude Code: workspace trust is missing or unreadable; rerun start.sh"
-  failures=$((failures + 1))
+  source "$SCRIPT_DIR/os/ubuntu/doctor.sh"
 fi
 
 log "Checking GitHub Git credentials."
@@ -100,17 +98,21 @@ check_absent_dir "pyenv" "$HOME/.pyenv"
 check_absent_dir "rbenv" "$HOME/.rbenv"
 check_absent_dir "old gcloud installer" "$HOME/google-cloud-sdk"
 
-if [ -f "$HOME/.zshrc" ] && grep -q 'PC_SETUP_REPO_PATH/env/zshrc' "$HOME/.zshrc"; then
-  success "Shell bridge: ~/.zshrc sources pc-setup"
+# shellcheck source=lib/shell-profile.sh
+source "$PC_SETUP_REPO_PATH/lib/shell-profile.sh"
+if grep -Fq "PC_SETUP_REPO_PATH/env/${shell_profile}rc" "$rc_file" 2>/dev/null; then
+  success "Shell bridge: $rc_file sources pc-setup"
 else
-  error "Shell bridge: ~/.zshrc does not source pc-setup"
+  error "Shell bridge: $rc_file does not source pc-setup"
   failures=$((failures + 1))
 fi
 
 if [ -f "$HOME/.aws/config" ] && cmp -s "$SCRIPT_DIR/env/aws-config" "$HOME/.aws/config"; then
   success "AWS config: ~/.aws/config matches pc-setup"
+elif [ -f "$HOME/.aws/config" ]; then
+  note "AWS config: existing file differs from the MAP Lab template"
 else
-  error "AWS config: ~/.aws/config does not match pc-setup"
+  error "AWS config: ~/.aws/config is missing"
   failures=$((failures + 1))
 fi
 

@@ -1,0 +1,10 @@
+awscli
+ca-certificates
+curl
+gh
+git
+gnupg
+lsof
+shellcheck
+tmux
+tree

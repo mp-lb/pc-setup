@@ -1,17 +1,19 @@
-#!/bin/zsh
+#!/bin/bash
 
 set -e
 
-SCRIPT_DIR="${0:A:h}"
-REPO_DIR="${SCRIPT_DIR:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_FILE="$REPO_DIR/config/global-skills.txt"
 
 source "$REPO_DIR/lib/output.sh"
+source "$REPO_DIR/lib/paths.sh"
 
-export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
 
 if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
+  PATH="$(mise exec -- printenv PATH)"
+  export PATH
 fi
 
 if [ ! -f "$SKILLS_FILE" ]; then

@@ -1,0 +1,5 @@
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
+export PATH="$PC_SETUP_REPO_PATH/bin:$PATH"
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash)"
+fi

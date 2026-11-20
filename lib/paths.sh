@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 if [ -n "${ZSH_VERSION:-}" ]; then
   _PC_SETUP_PATHS_SOURCE="${(%):-%x}"

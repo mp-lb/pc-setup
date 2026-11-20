@@ -1,91 +1,76 @@
 # PC setup
 
-PC setup is the MAP Lab development-machine bootstrapper. The current scripts
-support macOS; Linux and Windows setup can be added later. It owns the small
-layer below project development:
-
-- Homebrew and Homebrew-managed host tools
-- mise for runtime/tool versions
-- Claude Code CLI and workspace trust
-- Forum (`fm`), Berth (`berth`), and Zapper (`zap`) CLI installation
-- GitHub authentication and Git credential helper setup
-- shell bridge files
-- MAP Lab AWS SSO config
-- global Codex and Claude Code skills
-
-It does not directly manage Node, Python, or Ruby with `nvm`, `pyenv`, or
-`rbenv` anymore. Those belong to mise.
+PC setup bootstraps MAP Lab development machines on macOS and Ubuntu. It
+installs host tools, mise-managed runtimes, Claude Code, the Forum, Berth and
+Zapper CLIs, and global agent skills. It also configures GitHub credentials,
+a shell profile bridge and MAP Lab AWS SSO profiles.
 
 ## Install
 
-```
-/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/start.sh)"
-```
+From an existing checkout, run:
 
-The install script assumes you're running it as the admin user on the machine. If the repository already exists at `~/Work/pc-setup`, the script will reuse it instead of cloning again.
-
-Set `PC_SETUP_WORKSPACE` to use a different Work folder, and optionally
-`PC_SETUP_REPO_PATH` to place this checkout elsewhere. Both paths are saved in the
-shell bridge for future terminals. For example:
-
-```sh
-export PC_SETUP_WORKSPACE="$HOME/Development"
-/bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/start.sh)"
+```bash
+./start.sh
 ```
 
-Setup installs Claude Code through Homebrew and records trust for the resolved
-workspace path in `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`). Existing
-settings are preserved. Close Claude Code before rerunning setup so it does not
-overwrite the updated config. Claude Code can still ask for separate trust for Git
-repositories beneath the workspace; see its [workspace trust rules](https://code.claude.com/docs/en/permissions#project-allow-rules-and-workspace-trust).
+For a new checkout, run this from a terminal with Bash and curl:
 
-GitHub login is checked on every run, including when reusing a checkout, followed
-by `gh auth setup-git --hostname github.com`. Forum, Berth, and Zapper are installed
-from their published npm packages under the mise-managed Node runtime. Berth uses
-the production `@mp-lb/berth` package, never a development checkout link.
-
-## Doctor
-
-```
-~/Work/pc-setup/doctor.sh
+```bash
+installer=$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/start.sh) &&
+  /bin/bash -c "$installer"
 ```
 
-## Inventory
+Run as your regular user. Setup prints the detected OS and asks before
+installing anything. Ubuntu uses sudo for apt and has been targeted at Ubuntu
+26.04 LTS. The installer may prompt for GitHub login and Git author details.
 
-```
-~/Work/pc-setup/inventory.sh
+The remote installer clones into `~/Work/pc-setup` by default. A local run
+uses the current checkout and its parent as the workspace. Set
+`PC_SETUP_WORKSPACE` to choose a different Work folder and optionally
+`PC_SETUP_REPO_PATH` to choose the checkout path.
+
+Setup adds its shell bridge to the current login shell's Bash or zsh profile.
+Open a new terminal after installation. If you already have an AWS config,
+copy the MAP Lab profiles you need from `env/aws-config` into it.
+
+## Repository layout
+
+- `start.sh` detects the OS and dispatches to the selected recipe.
+- `os/macos/` contains the macOS recipe and Homebrew manifests.
+- `os/ubuntu/` contains the Ubuntu recipe and apt package list.
+- `lib/`, `env/`, `config/` and `bin/` contain shared user setup, configuration
+  and commands.
+
+## Verify
+
+```bash
+./doctor.sh
+./inventory.sh
 ```
 
-## Optional apps
+## Optional apps and containers
 
-Large app/cask installs are intentionally outside the default bootstrap path.
-Install them when needed:
+On macOS, install OrbStack separately:
 
+```bash
+brew bundle --file os/macos/Brewfile.apps
 ```
-brew bundle --file ~/Work/pc-setup/Brewfile.apps
-```
+
+On Ubuntu, install [Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/ubuntu/)
+if you need containers. Use `docker info` and `docker compose version` to verify
+that your normal account can use them. Ubuntu desktop apps are outside the
+base install.
+
+Install the [Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk)
+separately on Ubuntu if needed. The macOS bundle includes it.
 
 ## Agent skills
 
-Global agent skills are declared in `config/global-skills.txt` and installed for Codex
-and Claude Code:
-
-```
-~/Work/pc-setup/bin/install-skills
-```
+Global skills for Codex and Claude Code are listed in
+`config/global-skills.txt`. To install them again, run `./bin/install-skills`.
 
 ## Uninstall legacy runtime state
 
-```
-~/Work/pc-setup/uninstall.sh
-```
-
-This removes legacy pc-setup-managed runtime directories such as `~/.nvm`,
-`~/.pyenv`, `~/.rbenv`, and the old `~/google-cloud-sdk` installer. It does not
-delete `~/Work`, Homebrew, git config, gh auth, or project files.
-
-To also clear mise-managed runtime state:
-
-```
-~/Work/pc-setup/uninstall.sh --all
-```
+`./uninstall.sh` removes legacy runtime directories and the managed shell
+bridge. `./uninstall.sh --all` also clears mise runtime state. Existing package
+managers, system packages, Git config and workspace files remain in place.

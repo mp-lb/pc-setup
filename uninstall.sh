@@ -1,8 +1,8 @@
-#!/bin/zsh
+#!/bin/bash
 
 set -e
 
-SCRIPT_DIR="${0:A:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/output.sh"
 source "$SCRIPT_DIR/lib/paths.sh"
 
@@ -17,7 +17,9 @@ rm -rf "$HOME/.nvm"
 rm -rf "$HOME/.pyenv"
 rm -rf "$HOME/.rbenv"
 rm -rf "$HOME/google-cloud-sdk"
-rm -rf "$HOME/Library/pnpm"
+if [[ "$OSTYPE" == darwin* ]]; then
+  source "$SCRIPT_DIR/os/macos/uninstall-legacy.sh"
+fi
 rm -rf "$HOME/.config/pypoetry"
 
 if [ "${1:-}" = "--all" ]; then
@@ -26,9 +28,21 @@ if [ "${1:-}" = "--all" ]; then
   rm -rf "$HOME/.config/mise"
 fi
 
-if [ -f "$HOME/.zshrc" ] && grep -q 'PC_SETUP_REPO_PATH/env/zshrc' "$HOME/.zshrc"; then
-  rm -f "$HOME/.zshrc"
-fi
+for rc_file in "$HOME"/.{bashrc,zshrc,bash_profile,bash_login,profile}; do
+  if grep -Fxq '# >>> pc-setup >>>' "$rc_file" 2>/dev/null &&
+     grep -Fxq '# <<< pc-setup <<<' "$rc_file"; then
+    updated_rc=$(mktemp)
+    awk '
+      $0 == "# >>> pc-setup >>>" { in_block = 1; next }
+      $0 == "# <<< pc-setup <<<" { in_block = 0; next }
+      !in_block
+      END { if (in_block) exit 1 }
+    ' "$rc_file" > "$updated_rc" && cat "$updated_rc" > "$rc_file"
+    rm -f "$updated_rc"
+  elif grep -Fq 'PC_SETUP_REPO_PATH/env/zshrc' "$rc_file" 2>/dev/null; then
+    note "Remove the legacy pc-setup lines from $rc_file if desired."
+  fi
+done
 
 success "Legacy pc-setup-managed runtime cleanup complete."
 note "Homebrew, gh auth, git config, $PC_SETUP_WORKSPACE, and project files were intentionally left in place."

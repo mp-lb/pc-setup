@@ -1,14 +1,15 @@
-#!/bin/zsh
+#!/bin/bash
 
 set -e
 
-SCRIPT_DIR="${0:A:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/paths.sh"
 
-export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
 
 if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
+  PATH="$(mise exec -- printenv PATH)"
+  export PATH
 fi
 
 print_version() {
@@ -25,7 +26,6 @@ print_version() {
 
 echo "pc-setup inventory"
 echo
-print_version "brew" brew --version
 print_version "gh" gh --version
 print_version "mise" mise --version
 print_version "node" node --version
@@ -39,6 +39,8 @@ print_version "clerk" clerk --version
 print_version "aws" aws --version
 print_version "gcloud" gcloud --version
 print_version "tree" tree --version
+print_version "task" task --version
+print_version "overmind" overmind --version
 print_version "docker" docker --version
 
 echo
@@ -50,11 +52,10 @@ else
 fi
 
 echo
-echo "homebrew bundle"
-if command -v brew >/dev/null 2>&1; then
-  brew bundle check --file "$PC_SETUP_REPO_PATH/Brewfile" || true
+if [[ "$OSTYPE" == darwin* ]]; then
+  source "$SCRIPT_DIR/os/macos/inventory.sh"
 else
-  echo "brew missing"
+  source "$SCRIPT_DIR/os/ubuntu/inventory.sh"
 fi
 
 echo

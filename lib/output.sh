@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 OUTPUT_TAG="[pc-setup]"
 
