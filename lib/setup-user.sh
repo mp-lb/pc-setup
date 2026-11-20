@@ -1,10 +1,10 @@
 #!/bin/bash
 
 setup_user() {
-  local shell_profile rc_file
+  local rc_file="$HOME/.zshrc"
+  local installer login_shell
   local git_name git_email
 
-  . "$PC_SETUP_REPO_PATH/lib/shell-profile.sh"
   . "$PC_SETUP_REPO_PATH/lib/output.sh"
   . "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
 
@@ -30,9 +30,15 @@ setup_user() {
       printf '\n# >>> pc-setup >>>\n'
       printf 'export PC_SETUP_WORKSPACE=%q\n' "$PC_SETUP_WORKSPACE"
       printf 'export PC_SETUP_REPO_PATH=%q\n' "$PC_SETUP_REPO_PATH"
-      printf 'source "$PC_SETUP_REPO_PATH/env/%src"\n' "$shell_profile"
+      printf 'source "$PC_SETUP_REPO_PATH/env/zshrc"\n'
       printf '# <<< pc-setup <<<\n'
     } >> "$rc_file"
+  fi
+
+  if [ ! -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    log "Installing Oh My Zsh."
+    installer=$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)
+    ZSH="$HOME/.oh-my-zsh" KEEP_ZSHRC=yes sh -c "$installer" "" --unattended
   fi
 
   mkdir -p "$HOME/.aws"
@@ -40,6 +46,12 @@ setup_user() {
     install -m 600 "$PC_SETUP_REPO_PATH/env/aws-config" "$HOME/.aws/config"
   elif ! cmp -s "$PC_SETUP_REPO_PATH/env/aws-config" "$HOME/.aws/config"; then
     note "Kept your existing AWS config. MAP Lab profiles are in $PC_SETUP_REPO_PATH/env/aws-config."
+  fi
+
+  login_shell=$(get_login_shell)
+  if [[ "$login_shell" != */zsh ]]; then
+    log "Setting zsh as the login shell."
+    sudo chsh -s /bin/zsh "$(id -un)"
   fi
 
   success "PC setup finished. Open a new terminal and run $PC_SETUP_REPO_PATH/doctor.sh."

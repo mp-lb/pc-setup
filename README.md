@@ -29,8 +29,8 @@ uses the current checkout and its parent as the workspace. Set
 `PC_SETUP_WORKSPACE` to choose a different Work folder and optionally
 `PC_SETUP_REPO_PATH` to choose the checkout path.
 
-Setup adds its shell bridge to the current login shell's Bash or zsh profile.
-Open a new terminal after installation. If you already have an AWS config,
+Setup installs Oh My Zsh, adds its bridge to `~/.zshrc`, and sets zsh as your
+login shell. Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
 copy the MAP Lab profiles you need from `env/aws-config` into it.
 
 ## Repository layout

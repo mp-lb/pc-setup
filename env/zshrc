@@ -4,9 +4,11 @@ path=("$PC_SETUP_REPO_PATH/bin" "${path[@]}")
 
 export ZSH="$HOME/.oh-my-zsh"
 if [[ -f "$ZSH/oh-my-zsh.sh" ]]; then
-  plugins=(git docker docker-compose)
-  [[ "$OSTYPE" == darwin* ]] && plugins+=(brew)
-  source "$ZSH/oh-my-zsh.sh"
+  if (( ! $+functions[omz] )); then
+    plugins=(git docker docker-compose)
+    [[ "$OSTYPE" == darwin* ]] && plugins+=(brew)
+    source "$ZSH/oh-my-zsh.sh"
+  fi
   source "$PC_SETUP_REPO_PATH/env/zsh-theme.sh"
 fi
 if command -v mise >/dev/null 2>&1; then

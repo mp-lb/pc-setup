@@ -8,3 +8,4 @@ lsof
 shellcheck
 tmux
 tree
+zsh

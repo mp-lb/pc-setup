@@ -78,9 +78,14 @@ check_command "Overmind" overmind --version
 check_command "Go Task" task --version
 check_command "lsof" lsof
 check_command "tree" tree --version
+check_command "zsh" zsh --version
 if [[ "$OSTYPE" == darwin* ]]; then
+  # shellcheck source=os/macos/login-shell.sh
+  source "$SCRIPT_DIR/os/macos/login-shell.sh"
   source "$SCRIPT_DIR/os/macos/doctor.sh"
 else
+  # shellcheck source=os/ubuntu/login-shell.sh
+  source "$SCRIPT_DIR/os/ubuntu/login-shell.sh"
   source "$SCRIPT_DIR/os/ubuntu/doctor.sh"
 fi
 
@@ -98,9 +103,23 @@ check_absent_dir "pyenv" "$HOME/.pyenv"
 check_absent_dir "rbenv" "$HOME/.rbenv"
 check_absent_dir "old gcloud installer" "$HOME/google-cloud-sdk"
 
-# shellcheck source=lib/shell-profile.sh
-source "$PC_SETUP_REPO_PATH/lib/shell-profile.sh"
-if grep -Fq "PC_SETUP_REPO_PATH/env/${shell_profile}rc" "$rc_file" 2>/dev/null; then
+login_shell=$(get_login_shell || true)
+if [[ "$login_shell" == */zsh ]]; then
+  success "Login shell: $login_shell"
+else
+  error "Login shell: zsh is not configured"
+  failures=$((failures + 1))
+fi
+
+if [ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+  success "Oh My Zsh: installed"
+else
+  error "Oh My Zsh: missing"
+  failures=$((failures + 1))
+fi
+
+rc_file="$HOME/.zshrc"
+if grep -Fq 'PC_SETUP_REPO_PATH/env/zshrc' "$rc_file" 2>/dev/null; then
   success "Shell bridge: $rc_file sources pc-setup"
 else
   error "Shell bridge: $rc_file does not source pc-setup"

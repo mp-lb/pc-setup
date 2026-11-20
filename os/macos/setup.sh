@@ -25,11 +25,6 @@ fi
 
 brew bundle --file "$PC_SETUP_REPO_PATH/os/macos/Brewfile"
 
-source "$PC_SETUP_REPO_PATH/lib/shell-profile.sh"
-if [ "$shell_profile" = zsh ] && [ ! -d "$HOME/.oh-my-zsh" ]; then
-  installer=$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)
-  KEEP_ZSHRC=yes sh -c "$installer" "" --unattended
-fi
-
+source "$PC_SETUP_REPO_PATH/os/macos/login-shell.sh"
 source "$PC_SETUP_REPO_PATH/lib/setup-user.sh"
 setup_user

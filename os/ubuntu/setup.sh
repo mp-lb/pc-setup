@@ -26,5 +26,6 @@ command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | b
 
 mise use --global overmind@2.5.1
 
+source "$PC_SETUP_REPO_PATH/os/ubuntu/login-shell.sh"
 source "$PC_SETUP_REPO_PATH/lib/setup-user.sh"
 setup_user
