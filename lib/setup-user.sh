@@ -2,7 +2,7 @@
 
 setup_user() {
   local rc_file="$HOME/.zshrc"
-  local installer login_shell
+  local installer login_shell mise_trusted_paths
   local git_name git_email
 
   . "$PC_SETUP_REPO_PATH/lib/output.sh"
@@ -16,6 +16,18 @@ setup_user() {
     read -r -p 'Enter your email for git commits: ' git_email
     git config --global user.email "$git_email"
   fi
+
+  mise_trusted_paths=$(
+    unset MISE_TRUSTED_CONFIG_PATHS
+    mise settings get trusted_config_paths
+  )
+  case "$mise_trusted_paths" in
+    *'"~/Work"'*|*"\"$HOME/Work\""*) ;;
+    *)
+      log "Trusting mise configs under $HOME/Work."
+      mise settings add trusted_config_paths '~/Work'
+      ;;
+  esac
 
   log "Installing default mise tools."
   mise use --global node@lts pnpm@latest aqua:go-task/task@latest
