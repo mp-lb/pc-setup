@@ -44,6 +44,15 @@ print_version "overmind" overmind --version
 print_version "docker" docker --version
 
 echo
+echo "global npm packages and local links"
+if command -v npm >/dev/null 2>&1; then
+  npm prefix --global
+  npm ls --global --depth=0 || true
+else
+  echo "npm missing"
+fi
+
+echo
 echo "mise tools"
 if command -v mise >/dev/null 2>&1; then
   mise list || true

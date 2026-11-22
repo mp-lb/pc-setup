@@ -2,11 +2,22 @@
 
 set -euo pipefail
 
-# Install host CLIs independently of any project's active Node version.
-# Approve our verified Berth and Zapper packages despite their age/download count.
-mise use --global \
-  npm:@mp-lb/forum-cli@latest \
-  'npm:@mp-lb/berth[allow_low_downloads=true]@latest' \
-  'npm:@mp-lb/zapper[allow_low_downloads=true]@latest' \
-  npm:pm2@latest \
-  npm:clerk@latest
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/paths.sh"
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
+
+prefix="$HOME/.local/share/npm-global"
+packages=()
+for package in @mp-lb/forum-cli @mp-lb/berth @mp-lb/zapper pm2 clerk; do
+  # npm link stores a symlink here. Keep local development checkouts selected.
+  if [ -L "$prefix/lib/node_modules/$package" ]; then
+    printf 'Keeping local link: %s\n' "$package"
+  else
+    packages+=("$package")
+  fi
+done
+
+if [ -n "${packages[0]:-}" ]; then
+  mise exec node@lts -- npm install --global --prefix "$prefix" "${packages[@]}"
+fi
+mise exec node@lts -- npm config set prefix "$prefix" --location=user

@@ -32,29 +32,42 @@ uses the current checkout and its parent as the workspace. Set
 Setup adds `~/Work` to mise's global trusted paths. Mise loads configs from
 current and future checkouts under `~/Work` without prompting for trust.
 
-Forum, Berth, Zapper, PM2 and Clerk are installed as global mise `npm:` tools.
-Their installs are separate from Node's global npm packages, so they stay on
-PATH when a project selects a different Node version. They still run with the
-active Node version, which must meet the CLI's runtime requirements. See the
-[mise npm backend](https://mise.jdx.dev/dev-tools/backends/npm).
-The installer explicitly approves our Berth and Zapper packages for mise's
-new-package and low-download checks; dependency checks remain enabled.
+Setup configures npm's user-level global prefix as
+`~/.local/share/npm-global` and adds its `bin` directory to the shell PATH.
+Forum, Berth, Zapper, PM2 and Clerk are installed there with npm. Global
+packages and `npm link` links share this location across all mise Node versions.
+Project dependencies remain in each project's `node_modules`.
 
-To repair an existing machine that installed these CLIs with `npm install -g`,
-run this from the pc-setup checkout:
+To configure the prefix and install or update host CLIs, run:
 
 ```bash
 ./bin/install-host-clis
-mise exec node@lts -- npm uninstall -g @mp-lb/forum-cli @mp-lb/berth @mp-lb/zapper pm2 clerk
+```
+
+The installer preserves existing `npm link` symlinks. To use a local CLI,
+build it as required by its repository and run `npm link` from the package
+directory that declares its `bin`. The command then uses that checkout across
+projects. To return to a published version, run `npm unlink --global <package>`
+and `npm install --global <package>`.
+
+CLIs still run with the active Node version, which must meet their runtime
+requirements. Native dependencies may need rebuilding after a Node change.
+Open a new terminal after setup and run `~/Work/pc-setup/doctor.sh` from a
+project with its own `.node-version` to verify the prefix and command paths.
+
+When migrating from separate mise `npm:` installs, first run the installer
+above, then remove the superseded global registrations and installations:
+
+```bash
+mise unuse --global --no-prune npm:@mp-lb/forum-cli npm:@mp-lb/berth npm:@mp-lb/zapper npm:pm2 npm:clerk
+mise uninstall --all npm:@mp-lb/forum-cli npm:@mp-lb/berth npm:@mp-lb/zapper npm:pm2 npm:clerk
 mise reshim
 ```
 
-This also updates the CLIs and removes the old copies from the default LTS
-Node installation so they cannot shadow mise's separate installs. If you
-installed copies under other Node versions, remove those copies there too.
-Open a new terminal, then run `fm --version` and
-`~/Work/pc-setup/doctor.sh` from a project with its own `.node-version` to check
-that the tools work with the project's Node version.
+For old npm globals inside a Node installation, use an explicit old prefix
+when uninstalling (for example, `npm uninstall --global --prefix /path/to/node
+<package>`). Relink local checkouts into the shared prefix before removing old
+links. Doctor reports host commands that are still shadowed by another install.
 
 Setup installs Oh My Zsh, adds its bridge to `~/.zshrc`, and sets zsh as your
 login shell. Sign out and back in after installation to pick up the shell change. If you already have an AWS config,

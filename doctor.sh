@@ -79,6 +79,21 @@ check_command "Go Task" task --version
 check_command "lsof" lsof
 check_command "tree" tree --version
 check_command "zsh" zsh --version
+
+log "Checking shared npm globals."
+if [ "$(npm prefix --global 2>/dev/null)" = "$HOME/.local/share/npm-global" ]; then
+  success "npm: shared global prefix"
+else
+  error "npm: expected ~/.local/share/npm-global; run bin/install-host-clis"
+  failures=$((failures + 1))
+fi
+for host_cli in fm berth zap pm2 clerk; do
+  if [ "$(command -v "$host_cli")" != "$HOME/.local/share/npm-global/bin/$host_cli" ]; then
+    error "$host_cli: not resolving through the shared npm prefix"
+    failures=$((failures + 1))
+  fi
+done
+
 if [[ "$OSTYPE" == darwin* ]]; then
   # shellcheck source=os/macos/login-shell.sh
   source "$SCRIPT_DIR/os/macos/login-shell.sh"
