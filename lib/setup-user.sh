@@ -31,7 +31,7 @@ setup_user() {
 
   log "Installing default mise tools."
   mise use --global node@lts pnpm@latest aqua:go-task/task@latest
-  mise exec -- npm install -g @mp-lb/forum-cli @mp-lb/berth @mp-lb/zapper pm2 clerk
+  "$PC_SETUP_REPO_PATH/bin/install-host-clis"
 
   "$PC_SETUP_REPO_PATH/bin/install-skills"
 

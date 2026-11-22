@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Install host CLIs independently of any project's active Node version.
+# Approve our verified Berth and Zapper packages despite their age/download count.
+mise use --global \
+  npm:@mp-lb/forum-cli@latest \
+  'npm:@mp-lb/berth[allow_low_downloads=true]@latest' \
+  'npm:@mp-lb/zapper[allow_low_downloads=true]@latest' \
+  npm:pm2@latest \
+  npm:clerk@latest

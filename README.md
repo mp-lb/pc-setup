@@ -32,6 +32,30 @@ uses the current checkout and its parent as the workspace. Set
 Setup adds `~/Work` to mise's global trusted paths. Mise loads configs from
 current and future checkouts under `~/Work` without prompting for trust.
 
+Forum, Berth, Zapper, PM2 and Clerk are installed as global mise `npm:` tools.
+Their installs are separate from Node's global npm packages, so they stay on
+PATH when a project selects a different Node version. They still run with the
+active Node version, which must meet the CLI's runtime requirements. See the
+[mise npm backend](https://mise.jdx.dev/dev-tools/backends/npm).
+The installer explicitly approves our Berth and Zapper packages for mise's
+new-package and low-download checks; dependency checks remain enabled.
+
+To repair an existing machine that installed these CLIs with `npm install -g`,
+run this from the pc-setup checkout:
+
+```bash
+./bin/install-host-clis
+mise exec node@lts -- npm uninstall -g @mp-lb/forum-cli @mp-lb/berth @mp-lb/zapper pm2 clerk
+mise reshim
+```
+
+This also updates the CLIs and removes the old copies from the default LTS
+Node installation so they cannot shadow mise's separate installs. If you
+installed copies under other Node versions, remove those copies there too.
+Open a new terminal, then run `fm --version` and
+`~/Work/pc-setup/doctor.sh` from a project with its own `.node-version` to check
+that the tools work with the project's Node version.
+
 Setup installs Oh My Zsh, adds its bridge to `~/.zshrc`, and sets zsh as your
 login shell. Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
 copy the MAP Lab profiles you need from `env/aws-config` into it.
