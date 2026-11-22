@@ -74,6 +74,7 @@ check_command "Berth" berth --version
 check_command "Zapper" zap --version
 check_command "Clerk CLI" clerk --version
 check_command "AWS CLI" aws --version
+check_command "Google Cloud CLI" gcloud --version
 check_command "Overmind" overmind --version
 check_command "Go Task" task --version
 check_command "lsof" lsof

@@ -20,11 +20,13 @@ fi
 mapfile -t packages < "$PC_SETUP_REPO_PATH/os/ubuntu/apt-packages.txt"
 sudo apt-get install -y "${packages[@]}"
 
+bash "$PC_SETUP_REPO_PATH/os/ubuntu/install-gcloud.sh"
+
 export PATH="$HOME/.local/bin:$PATH"
 command -v mise >/dev/null 2>&1 || curl -fsSL https://mise.run | sh
 command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
 
-mise use --global overmind@2.5.1
+mise use --global --fuzzy overmind@latest
 
 source "$PC_SETUP_REPO_PATH/os/ubuntu/login-shell.sh"
 source "$PC_SETUP_REPO_PATH/lib/setup-user.sh"

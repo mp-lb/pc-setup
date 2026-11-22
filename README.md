@@ -101,8 +101,25 @@ if you need containers. Use `docker info` and `docker compose version` to verify
 that your normal account can use them. Ubuntu desktop apps are outside the
 base install.
 
-Install the [Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk)
-separately on Ubuntu if needed. The macOS bundle includes it.
+## Google Cloud CLI and Overmind
+
+Setup installs the [Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk)
+on both platforms: through Homebrew on macOS and Google's signed apt repository
+on Ubuntu. Doctor requires it on both platforms.
+
+To add or update it on an existing Ubuntu machine without rerunning setup:
+
+```bash
+bash os/ubuntu/install-gcloud.sh
+```
+
+Overmind uses Homebrew's current version on macOS and `overmind@latest` through
+mise on Ubuntu. Setup does not pin an Overmind release. To update an existing
+Ubuntu installation and remove the old version pin, run:
+
+```bash
+mise use --global --fuzzy overmind@latest
+```
 
 ## Agent skills
 
