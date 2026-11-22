@@ -28,7 +28,7 @@ if [ "${1:-}" = "--all" ]; then
   rm -rf "$HOME/.config/mise"
 fi
 
-for rc_file in "$HOME"/.{bashrc,zshrc,bash_profile,bash_login,profile}; do
+for rc_file in "$HOME"/.{bashrc,bash_profile,bash_login,profile} "${ZDOTDIR:-$HOME}"/.{zshenv,zshrc}; do
   if grep -Fxq '# >>> pc-setup >>>' "$rc_file" 2>/dev/null &&
      grep -Fxq '# <<< pc-setup <<<' "$rc_file"; then
     updated_rc=$(mktemp)

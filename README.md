@@ -69,9 +69,34 @@ when uninstalling (for example, `npm uninstall --global --prefix /path/to/node
 <package>`). Relink local checkouts into the shared prefix before removing old
 links. Doctor reports host commands that are still shadowed by another install.
 
-Setup installs Oh My Zsh, adds its bridge to `~/.zshrc`, and sets zsh as your
-login shell. Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
+Setup installs Oh My Zsh, adds bridges to `~/.zshenv` and `~/.zshrc`, and sets
+zsh as your login shell. With `ZDOTDIR` set, the bridges go there instead.
+Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
 copy the MAP Lab profiles you need from `env/aws-config` into it.
+
+### Non-interactive shells
+
+Zsh reads `.zshenv` for ordinary interactive and non-interactive invocations
+on both macOS and Ubuntu. PC setup uses it for host CLI paths, helper commands
+and mise shims. `.zshrc` keeps Oh My Zsh, aliases, custom interactive settings
+and full mise activation. The shims select tools for the current project even
+when an agent or script starts with a minimal PATH.
+
+To add the bridges on an existing machine without rerunning the full setup:
+
+```bash
+./bin/install-shell
+mise reshim
+./doctor.sh
+```
+
+The installer preserves existing shell configuration and skips installed
+bridges. New zsh processes pick up the change immediately. Existing terminals
+can run `exec zsh` to reload it. Shells started with `zsh -f` deliberately skip
+user startup files; Bash and processes that do not launch zsh are not covered.
+Shims load mise environment variables for the tool they launch, not the parent
+shell. Use `mise exec -- <command>` when a whole command needs the project
+environment. See [mise's shim documentation](https://mise.jdx.dev/dev-tools/shims.html).
 
 ## Repository layout
 

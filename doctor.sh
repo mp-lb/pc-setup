@@ -134,11 +134,26 @@ else
   failures=$((failures + 1))
 fi
 
-rc_file="$HOME/.zshrc"
-if grep -Fq 'PC_SETUP_REPO_PATH/env/zshrc' "$rc_file" 2>/dev/null; then
-  success "Shell bridge: $rc_file sources pc-setup"
+for profile in zshenv zshrc; do
+  rc_file="${ZDOTDIR:-$HOME}/.$profile"
+  if grep -Fq "PC_SETUP_REPO_PATH/env/$profile" "$rc_file" 2>/dev/null; then
+    success "Shell bridge: $rc_file sources pc-setup"
+  else
+    error "Shell bridge: $rc_file does not source pc-setup; run bin/install-shell"
+    failures=$((failures + 1))
+  fi
+done
+
+# Do not let this process's activated PATH hide a broken shell bridge.
+if env -i HOME="$HOME" ZDOTDIR="${ZDOTDIR:-$HOME}" PATH=/usr/bin:/bin /bin/zsh -c '
+  for tool in mise node pnpm fm berth zap; do
+    command -v "$tool" >/dev/null || exit 1
+  done
+  node --version >/dev/null && pnpm --version >/dev/null
+'; then
+  success "Non-interactive zsh: runtimes and host CLIs available from a clean PATH"
 else
-  error "Shell bridge: $rc_file does not source pc-setup"
+  error "Non-interactive zsh: missing or unhealthy tools; run bin/install-shell and mise reshim"
   failures=$((failures + 1))
 fi
 

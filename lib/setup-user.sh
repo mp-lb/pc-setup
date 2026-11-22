@@ -1,7 +1,6 @@
 #!/bin/bash
 
 setup_user() {
-  local rc_file="$HOME/.zshrc"
   local installer login_shell mise_trusted_paths
   local git_name git_email
 
@@ -35,17 +34,7 @@ setup_user() {
 
   "$PC_SETUP_REPO_PATH/bin/install-skills"
 
-  if ! grep -Fq '# >>> pc-setup >>>' "$rc_file" 2>/dev/null &&
-     ! grep -Fq 'PC_SETUP_REPO_PATH/env/zshrc' "$rc_file" 2>/dev/null; then
-    log "Adding the shell bridge to $rc_file."
-    {
-      printf '\n# >>> pc-setup >>>\n'
-      printf 'export PC_SETUP_WORKSPACE=%q\n' "$PC_SETUP_WORKSPACE"
-      printf 'export PC_SETUP_REPO_PATH=%q\n' "$PC_SETUP_REPO_PATH"
-      printf 'source "$PC_SETUP_REPO_PATH/env/zshrc"\n'
-      printf '# <<< pc-setup <<<\n'
-    } >> "$rc_file"
-  fi
+  "$PC_SETUP_REPO_PATH/bin/install-shell"
 
   if [ ! -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
     log "Installing Oh My Zsh."

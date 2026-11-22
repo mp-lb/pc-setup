@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/paths.sh"
+
+for profile in zshenv zshrc; do
+  rc_file="${ZDOTDIR:-$HOME}/.$profile"
+  if grep -Fq "PC_SETUP_REPO_PATH/env/$profile" "$rc_file" 2>/dev/null; then
+    continue
+  fi
+  if grep -Fq '# >>> pc-setup >>>' "$rc_file" 2>/dev/null; then
+    printf 'Unrecognized pc-setup block in %s; review it before installing.\n' "$rc_file" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$rc_file")"
+  printf 'Adding the shell bridge to %s.\n' "$rc_file"
+  {
+    printf '\n# >>> pc-setup >>>\n'
+    printf 'export PC_SETUP_WORKSPACE=%q\n' "$PC_SETUP_WORKSPACE"
+    printf 'export PC_SETUP_REPO_PATH=%q\n' "$PC_SETUP_REPO_PATH"
+    printf 'source "$PC_SETUP_REPO_PATH/env/%s"\n' "$profile"
+    printf '# <<< pc-setup <<<\n'
+  } >> "$rc_file"
+done

@@ -1,0 +1,8 @@
+# Every zsh needs tool paths, including non-interactive commands and scripts.
+# Keep prompts, plugins and mise's interactive hooks in zshrc.
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
+typeset -U path PATH
+path=("$PC_SETUP_REPO_PATH/bin" "${path[@]}")
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh --shims)"
+fi

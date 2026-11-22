@@ -47,12 +47,13 @@ When adding a tool:
 Before finishing, run:
 
 ```bash
-for file in *.sh bin/* lib/*.sh os/*/*.sh env/bashrc; do
+for file in *.sh bin/* lib/*.sh os/*/*.sh env/bashrc tests/*.sh; do
   bash -n "$file" || exit
 done
-for file in env/zshrc env/home-zshrc env/zsh-theme.sh; do
+for file in env/zshenv env/zshrc env/home-zshrc env/zsh-theme.sh; do
   zsh -n "$file" || exit
 done
+bash tests/shell-startup.sh
 ./doctor.sh
 ```
 
