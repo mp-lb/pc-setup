@@ -9,6 +9,7 @@ PC setup owns the host substrate and portable desktop preferences:
 - OS package managers and host CLI tools
 - mise installation and global default tools
 - Claude Code installation
+- global instructions and Forum skills for Codex and Claude Code
 - the Forum, production Berth, and Zapper CLI installs
 - GitHub authentication and Git credential helper setup
 - the shell bridge that activates mise and adds MAP Lab helper scripts to PATH
@@ -67,6 +68,7 @@ for file in env/zshenv env/zshrc env/home-zshrc env/zsh-theme.sh; do
   zsh -n "$file" || exit
 done
 bash tests/shell-startup.sh
+bash tests/agent-setup.sh
 ./doctor.sh
 ```
 

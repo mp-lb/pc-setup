@@ -2,7 +2,7 @@
 
 PC setup bootstraps MAP Lab development machines on macOS and Ubuntu. It
 installs host tools, mise-managed runtimes, Claude Code, the Forum, Berth and
-Zapper CLIs, and global agent skills. It also configures GitHub credentials,
+Zapper CLIs, and global instructions and skills for Codex and Claude Code. It also configures GitHub credentials,
 a shell profile bridge and MAP Lab AWS SSO profiles. On Ubuntu GNOME it also
 applies portable desktop appearance preferences and the bundled wallpaper.
 
@@ -23,7 +23,7 @@ installer=$(curl -fsSL https://raw.githubusercontent.com/mp-lb/pc-setup/main/sta
 
 Run as your regular user. Setup prints the detected OS and asks before
 installing anything. Ubuntu uses sudo for apt and has been targeted at Ubuntu
-26.04 LTS. The installer may prompt for GitHub login and Git author details.
+26.04 LTS. The installer may prompt for GitHub login, Forum login and Git author details.
 
 The remote installer clones into `~/Work/pc-setup` by default. A local run
 uses the current checkout and its parent as the workspace. Set
@@ -173,10 +173,31 @@ Ubuntu installation and remove the old version pin, run:
 mise use --global --fuzzy overmind@latest
 ```
 
-## Agent skills
+## Agent instructions and skills
 
-Global skills for Codex and Claude Code are listed in
-`config/global-skills.txt`. To install them again, run `./bin/install-skills`.
+Setup fetches `agents/global-instructions.md` from Forum's `mp-lb/mp-lb`
+store and installs it as `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`.
+These files are replaced with the shared source on each run. A failed or empty
+fetch leaves existing instructions intact.
+
+Setup also installs MAP Lab skills for both agents with:
+
+```bash
+fm skills / --store mp-lb/skills --agents all --global
+```
+
+Forum creates local skill stubs that fetch current instructions from the cloud.
+Additional third-party skills are listed in `config/global-skills.txt`.
+Both steps require Forum access; setup prompts for login when unauthenticated.
+To refresh instructions and skills without rerunning machine setup:
+
+```bash
+./bin/install-global-instructions
+./bin/install-skills
+```
+
+If Forum access fails, run `fm auth login` and retry. Edit shared instructions
+and MAP Lab skills in Forum rather than their generated local copies.
 
 ## Uninstall legacy runtime state
 

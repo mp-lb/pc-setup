@@ -81,6 +81,16 @@ check_command "lsof" lsof
 check_command "tree" tree --version
 check_command "zsh" zsh --version
 
+log "Checking global agent instructions."
+for instructions_file in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md"; do
+  if [ -s "$instructions_file" ]; then
+    success "Global instructions: $instructions_file"
+  else
+    error "Global instructions: missing or empty $instructions_file; run bin/install-global-instructions"
+    failures=$((failures + 1))
+  fi
+done
+
 log "Checking shared npm globals."
 if [ "$(npm prefix --global 2>/dev/null)" = "$HOME/.local/share/npm-global" ]; then
   success "npm: shared global prefix"

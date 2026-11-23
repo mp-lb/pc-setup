@@ -28,6 +28,8 @@ fi
 
 log "Installing global agent skills."
 
+fm skills / --store mp-lb/skills --agents all --global
+
 while IFS= read -r skill_source || [ -n "$skill_source" ]; do
   skill_source="${skill_source%%#*}"
   skill_source="${skill_source#"${skill_source%%[![:space:]]*}"}"

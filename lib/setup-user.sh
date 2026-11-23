@@ -32,6 +32,10 @@ setup_user() {
   mise use --global node@lts pnpm@latest aqua:go-task/task@latest
   "$PC_SETUP_REPO_PATH/bin/install-host-clis"
 
+  if ! fm auth status | grep -Fxq 'Authenticated'; then
+    fm auth login
+  fi
+  "$PC_SETUP_REPO_PATH/bin/install-global-instructions"
   "$PC_SETUP_REPO_PATH/bin/install-skills"
 
   "$PC_SETUP_REPO_PATH/bin/install-shell"

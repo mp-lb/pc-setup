@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/paths.sh"
+source "$PC_SETUP_REPO_PATH/lib/output.sh"
+source "$PC_SETUP_REPO_PATH/lib/runtime-path.sh"
+
+if command -v mise >/dev/null 2>&1; then
+  PATH="$(mise exec -- printenv PATH)"
+  export PATH
+fi
+
+log "Fetching global instructions for Codex and Claude Code."
+if ! instructions=$(fm read agents/global-instructions.md --store mp-lb/mp-lb); then
+  error "Could not fetch global instructions. Check Forum access with fm auth login, then retry."
+  exit 1
+fi
+if [[ ! "$instructions" =~ [^[:space:]] ]]; then
+  error "Forum returned empty global instructions; existing files were preserved."
+  exit 1
+fi
+
+mkdir -p "$HOME/.codex" "$HOME/.claude"
+printf '%s\n' "$instructions" | tee "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md" >/dev/null
+success "Global instructions installed for Codex and Claude Code."
