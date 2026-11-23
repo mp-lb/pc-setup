@@ -28,4 +28,5 @@ if [ "$#" -eq 1 ]; then
   install -m 644 "$1"/BerkeleyMono-*.otf "$berkeley_dir/"
   fc-cache -f "$berkeley_dir"
   echo "Installed Berkeley Mono for the current user."
+  echo "Restart terminal apps to discover new fonts; ptyxis --standalone opens a fresh instance without closing sessions."
 fi

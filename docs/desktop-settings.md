@@ -59,6 +59,12 @@ refreshes the cache. The regular face must be present. Terminals that follow
 GNOME's monospace preference then use Berkeley Mono; apps with an explicit font
 override retain that override.
 
+After installing new font files, fully restart running terminal applications
+once existing sessions can be closed. A new tab or window can reuse the old
+Ptyxis process and its font cache. To check a fresh process without closing
+existing sessions, use `ptyxis --standalone`. Confirm the font in that terminal;
+a fontconfig match in a separate process does not verify a running terminal.
+
 ## Apply
 
 From a logged-in Ubuntu GNOME session, as your regular user:
