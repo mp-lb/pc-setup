@@ -6,6 +6,7 @@ import contextlib
 import ctypes
 import fcntl
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -16,10 +17,37 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
+import zipfile
 
 UUID = 'ubuntu-command@mp-lb.dev'
 SCHEMA = 'org.gnome.shell'
 KEYS = ('enabled-extensions', 'disabled-extensions')
+VERSION = '0.15.19'
+ARCHIVES = {
+    'x86_64': '61db029d4ee19b9431120ab740574b9b0d2740d9b5b98bbc3375601fdf2687d3',
+    'aarch64': 'a0f1cf1428c8a60d95009519cffc2971bbcf695564ea1fcd5e95aa3719dd69b0',
+}
+APP_FILES = ('control.py', 'runtime.py', 'bridge.py', 'config.json', 'pc.json', 'apple.json', 'xremap', 'XREMAP-LICENSE')
+
+
+def engine_payload(archive=None):
+    arch = platform.machine()
+    if arch not in ARCHIVES:
+        raise RuntimeError('No pinned Xremap binary for this architecture.')
+    if archive is None:
+        url = f'https://github.com/xremap/xremap/releases/download/v{VERSION}/xremap-linux-{arch}-socket.zip'
+        with urllib.request.urlopen(url, timeout=60) as response:
+            blob = response.read(32 * 1024 * 1024 + 1)
+    else:
+        blob = Path(archive).read_bytes()
+    if hashlib.sha256(blob).hexdigest() != ARCHIVES[arch]:
+        raise RuntimeError('Xremap archive checksum mismatch; nothing installed.')
+    # Read the one expected file, never extract archive paths onto the filesystem.
+    with zipfile.ZipFile(io.BytesIO(blob)) as bundle:
+        if bundle.namelist() != ['xremap'] or bundle.getinfo('xremap').file_size > 64 * 1024 * 1024:
+            raise RuntimeError('Unexpected Xremap archive contents.')
+        return bundle.read('xremap')
 
 
 def command(args, **kwargs):
@@ -71,7 +99,7 @@ class Desktop:
 
 
 class Install:
-    def __init__(self, data=None, state=None, desktop=None, source=None):
+    def __init__(self, data=None, state=None, desktop=None, source=None, engine=None, runtime=None):
         self.data = Path(data or os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share').absolute()
         self.state = Path(state or os.environ.get('XDG_STATE_HOME') or Path.home() / '.local/state').absolute()
         self.app = self.data / 'ubuntu-command'
@@ -82,26 +110,33 @@ class Install:
         self.desktop = desktop or Desktop()
         self.source = Path(source).resolve() if source else Path(__file__).resolve().parent
         self.roots = {'app': self.app, 'extension': self.ext, 'launcher': self.launcher}
+        from runtime import Runtime
+        self.runtime = runtime or Runtime(self.app)
+        self.engine = engine
 
     def files(self):
         payload = {}
-        for name in ('control.py', 'driver.py', 'mapping.py'):
-            payload['app/' + name] = (self.source / name).read_bytes()
+        for name in APP_FILES:
+            payload['app/' + name] = (self.engine if self.engine is not None else engine_payload()) if name == 'xremap' else (self.source / name).read_bytes()
         for name in ('metadata.json', 'extension.js'):
             payload['extension/' + name] = (self.source / 'extension' / name).read_bytes()
         executable = str(self.app / 'control.py').replace('\\', '\\\\').replace('"', '\\"')
         payload['app/run.lock'] = b''
         payload['launcher'] = ('[Desktop Entry]\nType=Application\nName=Ubuntu Command\n'
-                              'Comment=Start a temporary Mac-style keyboard session\n'
-                              f'Exec=/usr/bin/python3 "{executable}" start\n'
-                              'Terminal=true\nCategories=Utility;\n').encode()
+                              'Comment=Start Mac-style shortcuts with Xremap\n'
+                              f'Exec=/usr/bin/python3 "{executable}" start --notify\n'
+                              'Terminal=false\nCategories=Utility;\nActions=Stop;Uninstall;\n\n'
+                              '[Desktop Action Stop]\nName=Stop shortcuts\n'
+                              f'Exec=/usr/bin/python3 "{executable}" stop --notify\n\n'
+                              '[Desktop Action Uninstall]\nName=Uninstall Ubuntu Command\n'
+                              f'Exec=/usr/bin/python3 "{executable}" uninstall --notify\n').encode()
         return payload
 
     def path_for(self, label):
         # Never use arbitrary paths from a writable manifest for cleanup.
         if label == 'launcher':
             return self.launcher
-        allowed = {'app/control.py', 'app/driver.py', 'app/mapping.py', 'app/run.lock',
+        allowed = {'app/' + name for name in (*APP_FILES, 'run.lock', 'driver.py', 'mapping.py')} | {
                    'extension/metadata.json', 'extension/extension.js'}
         if label not in allowed:
             raise ValueError('Unknown installation file: ' + label)
@@ -121,7 +156,7 @@ class Install:
 
     def load(self):
         info = json.loads(self.record.read_text())
-        if info.get('version') != 1 or set(info) != {'version', 'files', 'dirs', 'desktop'}:
+        if info.get('version') not in (1, 2) or set(info) != {'version', 'files', 'dirs', 'desktop'}:
             raise ValueError('Invalid installation manifest; refusing destructive cleanup.')
         if not isinstance(info['files'], dict) or set(info['desktop']) != set(KEYS):
             raise ValueError('Invalid installation manifest contents.')
@@ -152,13 +187,14 @@ class Install:
         for path in (*self.roots.values(), self.record_dir):
             if os.path.lexists(path):
                 raise RuntimeError(f'Refusing to overwrite existing path: {path}')
+        self.runtime.ensure_absent()
         baseline = {key: self.desktop.read(key) for key in KEYS}
         if any(UUID in item['value'] for item in baseline.values()):
             raise RuntimeError('A pre-existing extension setting uses our UUID; nothing changed.')
         payload = self.files()  # Read all sources before changing the filesystem.
         new_dirs = sorted((p for p in self.allowed_dirs() if not os.path.lexists(p)),
                           key=lambda p: len(Path(p).parts))
-        info = {'version': 1, 'files': {k: hashlib.sha256(v).hexdigest() for k, v in payload.items()},
+        info = {'version': 2, 'files': {k: hashlib.sha256(v).hexdigest() for k, v in payload.items()},
                 'dirs': new_dirs, 'desktop': baseline}
         # Create the journal first. No desktop preferences change during install.
         self.record_dir.mkdir(parents=True, mode=0o700)
@@ -173,6 +209,8 @@ class Install:
                     stream.write(content)
                     stream.flush()
                     os.fsync(stream.fileno())
+                if label == 'app/xremap':
+                    staged.chmod(0o755)
             for directory in new_dirs:
                 if Path(directory) not in (self.app, self.ext):
                     Path(directory).mkdir(exist_ok=True, mode=0o700)
@@ -220,6 +258,7 @@ class Install:
                 continue
 
     def stop(self):
+        self.runtime.stop()
         # Discover live processes rather than trusting a crash-prone PID file.
         # pidfds ensure a recycled PID can never receive our signal.
         import select
@@ -253,8 +292,8 @@ class Install:
         for root in (self.app, self.ext, self.record_dir):
             if root.is_symlink():
                 raise RuntimeError(f'Replaced installation directory: {root}')
-        self.stop()
         with self.operation():
+            self.stop()
             # Hold the same lock the remapper needs before it can grab devices.
             lock = (self.app / 'run.lock').open('a') if self.app.is_dir() else None
             try:
@@ -309,19 +348,20 @@ class Install:
         print('Uninstalled. Session stopped, extension/settings restored, owned files removed.')
 
     def start(self, apple=False):
-        info = self.load()
-        for label, digest in info['files'].items():
-            path = self.path_for(label)
-            if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-                raise RuntimeError(f'Installed file differs from the recorded version: {path}')
-        self.desktop.enable()
-        command(['/usr/bin/gdbus', 'call', '--session', '--dest', 'org.gnome.Shell',
-                 '--object-path', '/dev/mplb/UbuntuCommand', '--method', 'dev.mplb.UbuntuCommand.Context'])
-        # -I and -B prevent loading user startup modules or creating root-owned bytecode.
-        args = ['/usr/bin/sudo', '/usr/bin/python3', '-I', '-B', str(self.app / 'driver.py')]
-        if apple:
-            args.append('--apple')
-        return subprocess.call(args)
+        with self.operation():
+            info = self.load()
+            if info['version'] != 2:
+                raise RuntimeError('Uninstall the old prototype before installing Xremap.')
+            for label, digest in info['files'].items():
+                path = self.path_for(label)
+                if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                    raise RuntimeError(f'Installed file differs from the recorded version: {path}')
+            self.runtime.ensure_absent()
+            self.desktop.enable()
+            # Fail before requesting administrator access if GNOME hasn't loaded us.
+            self.runtime.context()
+            self.runtime.start(apple)
+        print('Xremap is running in the background. Physical Ctrl+Alt+Esc stops it.')
 
 
 def preflight():
@@ -332,7 +372,7 @@ def preflight():
         raise RuntimeError('This version supports the Ubuntu GNOME Wayland session only.')
     if not command(['gnome-shell', '--version']).split()[-1].startswith('50.'):
         raise RuntimeError('This first version targets GNOME 50; other releases need explicit testing.')
-    for name in ('gdbus', 'gsettings', 'dconf', 'sudo', 'gnome-extensions'):
+    for name in ('gdbus', 'gsettings', 'dconf', 'pkexec', 'systemd-run', 'systemctl', 'loginctl', 'gnome-extensions'):
         if not shutil.which(name):
             raise RuntimeError(f'Missing prerequisite: {name}. No packages will be installed automatically.')
     if not Path('/dev/uinput').exists():
@@ -342,26 +382,37 @@ def preflight():
 def main():
     parser = argparse.ArgumentParser(description='Optional, session-only Mac-style keyboard shortcuts on Ubuntu.')
     parser.add_argument('action', choices=('install', 'start', 'stop', 'uninstall', 'status'))
+    parser.add_argument('--notify', action='store_true', help='Show desktop feedback when launched without a terminal.')
+    parser.add_argument('--archive', type=Path, help='Use a locally downloaded, checksum-verified Xremap release zip.')
     parser.add_argument('--apple', action='store_true', help='Use the physical Command key on an Apple keyboard.')
     args = parser.parse_args()
     if os.geteuid() == 0:
-        raise RuntimeError('Run control.py as your normal user. Only start requests sudo for opening devices.')
-    install = Install()
+        raise RuntimeError('Run control.py as your normal user. Start/stop request administrator authorization for the transient service.')
     if args.action in ('install', 'start'):
         preflight()
+    install = Install(engine=engine_payload(args.archive) if args.action == 'install' else None)
     if args.action == 'install':
         install.install()
     elif args.action == 'start':
-        return install.start(args.apple)
+        install.start(args.apple)
     elif args.action == 'stop':
-        install.stop()
+        with install.operation():
+            install.stop()
         print('Session stopped.')
     elif args.action == 'uninstall':
         install.uninstall()
     else:
         print('Installed' if install.record.exists() else 'Not installed')
-        print('Session running' if list(install.sessions()) else 'No running session')
+        print('Session running' if install.runtime.running() or list(install.sessions()) else 'No running session')
+    if args.notify:
+        notify({'start': 'Shortcuts are running. Ctrl+Alt+Esc stops them.',
+                'stop': 'Shortcuts stopped.', 'uninstall': 'Ubuntu Command removed.'}.get(args.action, 'Done.'))
     return 0
+
+
+def notify(message):
+    if shutil.which('notify-send'):
+        subprocess.run(['notify-send', 'Ubuntu Command', message], check=False)
 
 
 if __name__ == '__main__':
@@ -369,4 +420,6 @@ if __name__ == '__main__':
         sys.exit(main())
     except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
         print(f'Ubuntu Command: {exc}', file=sys.stderr)
+        if '--notify' in sys.argv:
+            notify(str(exc))
         sys.exit(1)

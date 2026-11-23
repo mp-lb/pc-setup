@@ -1,0 +1,11 @@
+{
+  "modmap": [
+    {
+      "name": "PC Command position",
+      "remap": {
+        "Alt_L": "Super_L",
+        "Super_L": "Alt_L"
+      }
+    }
+  ]
+}

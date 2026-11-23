@@ -76,9 +76,11 @@ reapplying restores the managed preferences.
 
 ## Optional Ubuntu Command trial
 
-The [Ubuntu Command tool](../os/ubuntu/command/README.md) provides a small,
-manually started macOS-style keyboard session for Ubuntu 26.04 / GNOME 50 on
-Wayland. It is not part of the default bootstrap. It uses no installed packages,
-persistent services, device-permission changes, or group memberships. Its README
+The [Ubuntu Command tool](../os/ubuntu/command/README.md) uses a pinned Xremap binary
+for manually started macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland.
+It runs quietly in transient background services and is not part of the default
+bootstrap. It changes no packages, persistent services, device permissions, or
+group memberships. Starting/stopping an active session requires administrator
+authorization; the emergency stop chord does not. Its README
 lists the exact user files and extension settings it owns, the uninstall command,
 and the current shortcut limitations.

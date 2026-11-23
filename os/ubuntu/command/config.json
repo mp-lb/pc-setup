@@ -1,0 +1,58 @@
+{
+  "keymap": [
+    {
+      "name": "Emergency stop after modifier swap",
+      "remap": {
+        "Ctrl-Super_L-Esc": {
+          "action": "exit"
+        },
+        "Ctrl-Alt_L-Esc": {
+          "action": "exit"
+        }
+      }
+    },
+    {
+      "name": "Terminal copy and close",
+      "application": {
+        "only": [
+          "/(?i)^(gnome-terminal-server|org\\.gnome\\.Terminal|kgx|org\\.gnome\\.Console|ptyxis|org\\.gnome\\.Ptyxis|alacritty|kitty|org\\.wezfurlong\\.wezterm|konsole|xterm)$/"
+        ]
+      },
+      "remap": {
+        "Super_L-c": "Ctrl-Shift-c",
+        "Super_L-v": "Ctrl-Shift-v",
+        "Super_L-w": "Ctrl-Shift-w",
+        "Super_L-Shift-w": "Ctrl-Shift-q",
+        "Super_L-t": "Ctrl-Shift-t",
+        "Super_L-n": "Ctrl-Shift-n"
+      }
+    },
+    {
+      "name": "Command shortcuts when desktop context is available",
+      "application": {
+        "only": "/.+/"
+      },
+      "remap": {
+        "Super_L-c": "Ctrl-Insert",
+        "Super_L-v": "Shift-Insert",
+        "Super_L-w": "Ctrl-w",
+        "Super_L-Shift-w": "Ctrl-Shift-w",
+        "Super_L-q": {
+          "launch": [
+            "ubuntu-command-quit"
+          ]
+        },
+        "Super_L-a": "Ctrl-a",
+        "Super_L-x": "Ctrl-x",
+        "Super_L-z": "Ctrl-z",
+        "Super_L-t": "Ctrl-t",
+        "Super_L-f": "Ctrl-f",
+        "Super_L-s": "Ctrl-s",
+        "Super_L-n": "Ctrl-n",
+        "Super_L-o": "Ctrl-o",
+        "Super_L-p": "Ctrl-p",
+        "Super_L-l": "Ctrl-l"
+      }
+    }
+  ]
+}

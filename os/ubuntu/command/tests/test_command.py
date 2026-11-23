@@ -16,9 +16,16 @@ from unittest.mock import patch
 
 SOURCE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SOURCE))
-from control import Install, Desktop, UUID, KEYS, publish
-from mapping import Mapper, ALT, SUPER, CTRL, SHIFT, C, V, W, Q, TAB, INSERT, RALT
-import driver
+from control import Install, Desktop, UUID, KEYS, publish, APP_FILES, engine_payload
+from runtime import Runtime
+from bridge import respond
+
+
+class FakeRuntime:
+    def ensure_absent(self):
+        pass
+    def stop(self):
+        pass
 
 
 class FakeDesktop:
@@ -53,7 +60,7 @@ class InstallTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.desktop = FakeDesktop()
-        self.install = Install(self.root / 'nested/data', self.root / 'nested/state', self.desktop, SOURCE)
+        self.install = Install(self.root / 'nested/data', self.root / 'nested/state', self.desktop, SOURCE, engine=b"fake-engine", runtime=FakeRuntime())
         self.quiet = contextlib.redirect_stdout(io.StringIO())
         self.quiet.__enter__()
         self.addCleanup(self.quiet.__exit__, None, None, None)
@@ -131,7 +138,7 @@ class InstallTests(unittest.TestCase):
 
     def test_changed_managed_file_blocks_deletion_and_retains_journal(self):
         self.install.install()
-        path = self.install.app / 'mapping.py'
+        path = self.install.app / 'config.json'
         original = path.read_bytes()
         path.write_text('custom code')
         with self.assertRaisesRegex(RuntimeError, 'Modified file'):
@@ -205,14 +212,14 @@ class InstallTests(unittest.TestCase):
 
     def test_partial_removal_is_retryable(self):
         self.install.install()
-        (self.install.app / 'mapping.py').unlink()
+        (self.install.app / 'config.json').unlink()
         (self.install.ext / 'metadata.json').unlink()
         self.install.uninstall()
         self.assertEqual(snapshot(self.root), {})
 
     def test_python_bytecode_not_in_installed_payload(self):
         self.install.install()
-        self.assertEqual({p.name for p in self.install.app.iterdir()}, {'mapping.py', 'driver.py', 'control.py', 'run.lock'})
+        self.assertEqual({p.name for p in self.install.app.iterdir()}, set(APP_FILES) | {'run.lock'})
         self.install.uninstall()
 
     def test_failed_initial_manifest_write_leaves_nothing(self):
@@ -266,153 +273,6 @@ time.sleep(60)
 
 
 
-class MappingTests(unittest.TestCase):
-    def make(self, terminal=False):
-        self.quits = 0
-        def quit_app():
-            self.quits += 1
-        return Mapper(lambda: {'wm_class': 'gnome-terminal-server' if terminal else 'firefox'}, quit_app)
-
-    def key(self, mapper, code, value=1, device=1):
-        return mapper.event(device, code, value)
-
-    def test_terminal_command_copy_keeps_control_interrupt_separate(self):
-        m = self.make(True)
-        self.assertEqual(self.key(m, ALT), [])
-        self.assertEqual(self.key(m, C), [(CTRL, 1), (SHIFT, 1), (C, 1)])
-        self.key(m, C, 0)
-        self.assertEqual(self.key(m, ALT, 0), [(CTRL, 0), (SHIFT, 0)])
-        self.assertEqual(self.key(m, CTRL), [(CTRL, 1)])
-        self.assertEqual(self.key(m, C), [(C, 1)])
-
-    def test_command_tab_keeps_super_until_command_release(self):
-        m = self.make()
-        self.key(m, ALT)
-        self.assertEqual(self.key(m, TAB), [(SUPER, 1), (TAB, 1)])
-        self.assertEqual(self.key(m, TAB, 0), [(TAB, 0)])
-        self.assertEqual(self.key(m, ALT, 0), [(SUPER, 0)])
-
-    def test_option_swap_and_altgr_passthrough(self):
-        m = self.make()
-        self.assertEqual(self.key(m, SUPER), [(ALT, 1)])
-        self.assertEqual(self.key(m, SUPER, 0), [(ALT, 0)])
-        self.assertEqual(self.key(m, RALT), [(RALT, 1)])
-        self.assertEqual(self.key(m, RALT, 0), [(RALT, 0)])
-
-    def test_gui_copy_uses_insert_not_sigint(self):
-        m = self.make()
-        self.key(m, ALT)
-        self.assertEqual(self.key(m, C), [(CTRL, 1), (INSERT, 1)])
-        self.assertEqual(self.key(m, C, 0), [(INSERT, 0)])
-        self.key(m, ALT, 0)
-        self.key(m, ALT)
-        self.assertEqual(self.key(m, V), [(SHIFT, 1), (INSERT, 1)])
-
-    def test_key_release_uses_original_mapping_after_context_change(self):
-        m = self.make()
-        self.key(m, ALT)
-        self.key(m, C)
-        m.context = lambda: {'wm_class': 'gnome-terminal-server'}
-        self.assertEqual(self.key(m, C, 2), [(INSERT, 2)])
-        self.assertEqual(self.key(m, C, 0), [(INSERT, 0)])
-
-    def test_shutdown_releases_all_output_keys(self):
-        m = self.make(True)
-        self.key(m, ALT)
-        self.key(m, C)
-        self.assertEqual(set(m.release_all()), {(C, 0), (CTRL, 0), (SHIFT, 0)})
-        self.assertEqual(m.release_all(), [])
-
-    def test_quit_requests_app_quit_once_not_a_key_or_repeat(self):
-        m = self.make()
-        self.key(m, ALT)
-        self.assertEqual(self.key(m, Q), [])
-        self.assertEqual(self.key(m, Q, 2), [])
-        self.assertEqual(self.key(m, Q, 0), [])
-        self.assertEqual(self.quits, 1)
-
-    def test_terminal_tab_and_window_close(self):
-        m = self.make(True)
-        self.key(m, ALT)
-        self.assertEqual(self.key(m, W)[-1], (W, 1))
-        self.key(m, W, 0)
-        self.key(m, SHIFT)
-        self.assertEqual(self.key(m, W)[-1], (Q, 1))
-
-    def test_multiple_keyboards_do_not_release_other_keyboard_modifier(self):
-        m = self.make()
-        self.key(m, CTRL, device=1)
-        self.assertEqual(self.key(m, CTRL, device=2), [])
-        self.assertEqual(self.key(m, CTRL, 0, device=1), [])
-        self.assertEqual(self.key(m, CTRL, 0, device=2), [(CTRL, 0)])
-
-    def test_apple_command_position(self):
-        m = Mapper(lambda: {'wm_class': 'firefox'}, lambda: None, apple=True)
-        self.assertEqual(self.key(m, SUPER), [])
-        self.assertEqual(self.key(m, C)[-1], (INSERT, 1))
-
-    def test_overlapping_chord_cannot_turn_terminal_copy_repeat_into_interrupt(self):
-        m = self.make(True)
-        self.key(m, ALT)
-        self.key(m, C)
-        # A second chord must not drop the synthetic Shift needed by held C.
-        events = self.key(m, 30)  # Command+A before C has been released
-        self.assertNotIn((SHIFT, 0), events)
-        self.assertIn(SHIFT, m.output_mods)
-        self.assertEqual(self.key(m, C, 2), [(C, 2)])
-        self.key(m, ALT, 0)
-        self.assertEqual(self.key(m, C, 2), [])
-
-    def test_two_keyboards_holding_same_key_produce_one_press_and_release(self):
-        m = self.make()
-        self.assertEqual(self.key(m, C, device=1), [(C, 1)])
-        self.assertEqual(self.key(m, C, device=2), [])
-        self.assertEqual(self.key(m, C, 0, device=1), [])
-        self.assertEqual(self.key(m, C, 0, device=2), [(C, 0)])
-
-
-class DriverTests(unittest.TestCase):
-    def test_privilege_drop_before_mapping_loop_and_fds_closed_on_crash(self):
-        order = []
-        with patch.object(sys, 'argv', ['driver.py']), patch.dict(os.environ, SUDO_UID='1000'), \
-             patch('driver.os.geteuid', return_value=0), \
-             patch('driver.os.open', return_value=12), patch('driver.fcntl.flock'), \
-             patch('driver.open_keyboards', side_effect=lambda: order.append('open') or [(10, 'path', 'name', bytes(96))]), \
-             patch('driver.create_output', side_effect=lambda d: order.append('output') or 11), \
-             patch('driver.drop_privileges', side_effect=lambda uid: order.append('drop')), \
-             patch('driver.run_session', side_effect=lambda *a: (_ for _ in ()).throw(RuntimeError('crash'))), \
-             patch('driver.os.close', side_effect=lambda fd: order.append(('close', fd))):
-            with self.assertRaises(RuntimeError):
-                driver.main()
-        self.assertEqual(order, ['open', 'output', 'drop', ('close', 11), ('close', 10), ('close', 12)])
-
-    def test_output_creation_failure_closes_open_keyboards(self):
-        with patch.object(sys, 'argv', ['driver.py']), patch.dict(os.environ, SUDO_UID='1000'), \
-             patch('driver.os.geteuid', return_value=0), \
-             patch('driver.os.open', return_value=12), patch('driver.fcntl.flock'), \
-             patch('driver.open_keyboards', return_value=[(10, 'p', 'n', b'')]), \
-             patch('driver.create_output', side_effect=OSError('denied')), \
-             patch('driver.os.close') as close:
-            with self.assertRaises(OSError):
-                driver.main()
-        self.assertEqual([x.args for x in close.call_args_list], [(10,), (12,)])
-
-    def test_kernel_ioctl_constants_match_local_headers(self):
-        if not shutil.which('cc'):
-            self.skipTest('C compiler unavailable')
-        code = '''#include <stdio.h>
-#include <linux/input.h>
-#include <linux/uinput.h>
-int main(void) {printf("%lu %lu %lu %lu %lu %zu", (unsigned long)EVIOCGRAB,
-(unsigned long)UI_DEV_CREATE,(unsigned long)UI_DEV_SETUP,(unsigned long)UI_SET_EVBIT,
-(unsigned long)UI_SET_KEYBIT,sizeof(struct input_event));}'''
-        with tempfile.TemporaryDirectory() as temp:
-            binary = Path(temp) / 'abi'
-            subprocess.run(['cc', '-x', 'c', '-', '-o', str(binary)], input=code, text=True, check=True)
-            values = list(map(int, subprocess.check_output([str(binary)], text=True).split()))
-        self.assertEqual(values, [driver.GRAB, driver.CREATE, driver.SETUP, driver.SET_EVBIT, driver.SET_KEYBIT, driver.EVENT.size])
-
-
 class RealDesktopTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('dbus-run-session') and shutil.which('dconf'), 'needs D-Bus/dconf')
     def test_real_private_dconf_install_enable_uninstall_exact_roundtrip(self):
@@ -420,11 +280,11 @@ class RealDesktopTests(unittest.TestCase):
 import os,sys,json
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from control import Install, Desktop, UUID, KEYS, publish, command
+from control import Install, Desktop, UUID, KEYS, publish, APP_FILES, engine_payload, command
 root=Path(sys.argv[2])
 desktop=Desktop()
 before={k:desktop.read(k) for k in KEYS}
-install=Install(root/'data',root/'state',desktop,Path(sys.argv[1]))
+install=Install(root/'data',root/'state',desktop,Path(sys.argv[1]),engine=b'fake-engine')
 install.install()
 command(['gsettings','set','org.gnome.shell','enabled-extensions',repr(['another-extension',UUID])])
 command(['gsettings','set','org.gnome.shell','disabled-extensions',repr([UUID])])
@@ -480,6 +340,187 @@ extension.disable();
             result = subprocess.run(['dbus-run-session', '--', 'gjs', '-m', str(path)],
                                     capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+class XremapTests(unittest.TestCase):
+    def test_bad_archive_is_rejected_before_extraction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'release.zip'
+            path.write_bytes(b'untrusted download')
+            with self.assertRaisesRegex(RuntimeError, 'checksum'):
+                engine_payload(path)
+
+    def test_configuration_with_upstream_parser(self):
+        binary = os.environ.get('XREMAP_TEST_BINARY')
+        if not binary:
+            self.skipTest('Set XREMAP_TEST_BINARY to a checksum-verified upstream binary')
+        for keyboard in ('pc.json', 'apple.json'):
+            result = subprocess.run([binary, '--validate-config', str(SOURCE/'config.json'), str(SOURCE/keyboard)],
+                                    text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_terminal_copy_and_interrupt_are_separate(self):
+        config = json.loads((SOURCE/'config.json').read_text())
+        terminal = next(item for item in config['keymap'] if item['name'].startswith('Terminal'))
+        self.assertEqual(terminal['remap']['Super_L-c'], 'Ctrl-Shift-c')
+        self.assertEqual(terminal['remap']['Super_L-v'], 'Ctrl-Shift-v')
+        self.assertFalse(any('Ctrl-c' in item['remap'] for item in config['keymap']))
+        common = config['keymap'][-1]
+        self.assertEqual(common['remap']['Super_L-c'], 'Ctrl-Insert')
+        self.assertIn('application', common)  # Missing desktop context cannot synthesize Ctrl+C.
+
+    def test_bridge_never_executes_arbitrary_launches_and_hides_locked_context(self):
+        calls = []
+        def context(method='Context'):
+            calls.append(method)
+            return {'locked': False, 'wm_class': 'kitty'}
+        self.assertEqual(respond('ActiveWindow', context), {'wm_class': 'kitty', 'title': ''})
+        self.assertEqual(respond({'Run': ['ubuntu-command-quit']}, context), 'Ok')
+        self.assertEqual(calls.count('Quit'), 1)
+        self.assertIn('Error', respond({'Run': ['/bin/sh', '-c', 'anything']}, context))
+        self.assertEqual(calls.count('Quit'), 1)
+        locked = lambda *args: {'locked': True, 'wm_class': 'private'}
+        self.assertEqual(respond('ActiveWindow', locked)['wm_class'], '')
+        self.assertIn('Error', respond({'Run': ['ubuntu-command-quit']}, locked))
+
+    def test_system_service_is_transient_sandboxed_and_tied_to_login(self):
+        runtime = Runtime(Path('/tmp/app with spaces'))
+        args = runtime.engine_command(False, 'session-2.scope')
+        self.assertIn('--collect', args)
+        self.assertIn('--property=BindsTo=session-2.scope', args)
+        self.assertIn('--property=ProtectHome=tmpfs', args)
+        self.assertIn('--property=RestrictAddressFamilies=AF_UNIX', args)
+        self.assertIn('--desktop=socket', args)  # Launches delegate to the user's restricted bridge.
+        self.assertIn('--property=BindReadOnlyPaths="/tmp/app with spaces" "' + str(runtime.directory) + '"', args)
+        self.assertNotIn('--user', args)
+
+    def test_unrelated_service_is_never_stopped(self):
+        runtime = Runtime(Path('/tmp/app'))
+        with patch('runtime.run', return_value='LoadState=loaded\nDescription=Someone else\nTransient=yes\nActiveState=active'), \
+             patch('runtime.subprocess.run') as execute:
+            with self.assertRaisesRegex(RuntimeError, 'unrelated'):
+                runtime.stop()
+            execute.assert_not_called()
+
+    def test_denied_stop_preserves_installed_files_and_journal(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            runtime = FakeRuntime()
+            install = Install(root/'data', root/'state', FakeDesktop(), SOURCE, b'engine', runtime)
+            install.install()
+            before = {name:path.read_bytes() for name in install.load()['files'] for path in [install.path_for(name)]}
+            with patch.object(runtime, 'stop', side_effect=PermissionError('authentication cancelled')):
+                with self.assertRaises(PermissionError):
+                    install.uninstall()
+            self.assertTrue(install.record.exists())
+            self.assertEqual(before, {name:install.path_for(name).read_bytes() for name in before})
+            install.uninstall()
+
+    def test_rejected_start_cleans_user_bridge(self):
+        runtime = Runtime(Path('/tmp/app'))
+        with patch.object(runtime, 'ensure_absent'), \
+             patch.object(runtime, 'context', return_value={'locked':False}), \
+             patch.object(runtime, 'session_scope', return_value='session-2.scope'), \
+             patch('runtime.run', return_value=''), patch('runtime.Path.exists', return_value=True), \
+             patch('runtime.subprocess.run', side_effect=subprocess.CalledProcessError(126, ['pkexec'])), \
+             patch.object(runtime, 'stop') as stop:
+            with self.assertRaises(subprocess.CalledProcessError):
+                runtime.start()
+            stop.assert_called_once()
+
+    def test_failed_engine_start_stops_both_services(self):
+        runtime = Runtime(Path('/tmp/app'))
+        with patch.object(runtime, 'ensure_absent'), \
+             patch.object(runtime, 'context', return_value={'locked':False}), \
+             patch.object(runtime, 'session_scope', return_value='session-2.scope'), \
+             patch('runtime.run', return_value=''), patch('runtime.Path.exists', return_value=True), \
+             patch('runtime.subprocess.run'), patch('runtime.time.sleep'), \
+             patch.object(runtime, 'state', return_value={'ActiveState':'failed'}), \
+             patch.object(runtime, 'stop') as stop:
+            with self.assertRaisesRegex(RuntimeError, 'exited'):
+                runtime.start()
+            stop.assert_called_once()
+
+    def test_real_socket_bridge_and_cleanup(self):
+        import select
+        import socket
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'run.lock').touch()
+            script='''import sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import bridge
+class LocalRuntime:
+    app=Path(sys.argv[2])
+    directory=app
+    def __init__(self,*a): pass
+    def state(self): return {'LoadState':'loaded'}
+bridge.Runtime=LocalRuntime
+original=bridge.respond
+bridge.respond=lambda request:original(request,lambda *a:{'locked':False,'wm_class':'kitty'})
+bridge.main()
+'''
+            process = subprocess.Popen([sys.executable,'-B','-c',script,str(SOURCE),str(root)], stderr=subprocess.PIPE)
+            try:
+                import time
+                path=root/'desktop.sock'
+                for _ in range(50):
+                    if path.exists(): break
+                    time.sleep(.05)
+                self.assertTrue(path.exists())
+                # A client that stalls must not kill the bridge.
+                with socket.socket(socket.AF_UNIX) as client:
+                    client.connect(str(path)); time.sleep(.7)
+                for request in ['ActiveWindow', {'Run':['/bin/sh']}]:
+                    with socket.socket(socket.AF_UNIX) as client:
+                        client.settimeout(3); client.connect(str(path))
+                        client.sendall(json.dumps(request).encode()+b'\n')
+                        response=json.loads(client.recv(4096))
+                    if request=='ActiveWindow': self.assertEqual(response['wm_class'],'kitty')
+                    else: self.assertIn('Error',response)
+                with (root/'run.lock').open() as lock:
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            finally:
+                process.terminate()
+                _,err=process.communicate(timeout=5)
+            self.assertEqual(process.returncode,0,err)
+            self.assertFalse(path.exists())
+            with (root/'run.lock').open() as lock:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+
+class ServiceLifecycleTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('XREMAP_TEST_SYSTEMD') == '1', 'opt in to transient user-service test')
+    def test_real_user_service_stop_removes_unit_and_runtime_directory(self):
+        import uuid
+        token = 'ubuntu-command-test-' + uuid.uuid4().hex
+        runtime = Runtime(Path('/tmp') / token)
+        runtime.unit = token + '.service'
+        runtime.bridge_unit = token + '.service'
+        runtime.directory = Path('/run/user') / str(os.getuid()) / token
+        runtime.ensure_absent()
+        try:
+            subprocess.run(['systemd-run','--user','--quiet','--collect','--service-type=exec',
+                            '--unit='+runtime.bridge_unit, '--description='+runtime.description,
+                            '--property=RuntimeDirectory='+token,'--property=RuntimeDirectoryMode=0700',
+                            '/usr/bin/sleep','60'],check=True,capture_output=True)
+            self.assertTrue(runtime.directory.is_dir())
+            self.assertEqual(runtime.state(True)['ActiveState'],'active')
+            runtime.stop()
+            self.assertFalse(runtime.directory.exists())
+            self.assertEqual(runtime.state(True)['LoadState'],'not-found')
+        finally:
+            subprocess.run(['systemctl','--user','stop',runtime.bridge_unit],capture_output=True)
+
+
+class QuitRepeatTests(unittest.TestCase):
+    def test_repeated_quit_requests_do_not_follow_focus_to_other_apps(self):
+        from bridge import QuitGuard
+        guard=QuitGuard()
+        self.assertTrue(guard.allow(0))
+        for moment in (.5,.55,.6,1,1.5,2):
+            self.assertFalse(guard.allow(moment))
+        self.assertTrue(guard.allow(3.1))
 
 
 if __name__ == '__main__':
