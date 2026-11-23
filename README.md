@@ -3,7 +3,8 @@
 PC setup bootstraps MAP Lab development machines on macOS and Ubuntu. It
 installs host tools, mise-managed runtimes, Claude Code, the Forum, Berth and
 Zapper CLIs, and global agent skills. It also configures GitHub credentials,
-a shell profile bridge and MAP Lab AWS SSO profiles.
+a shell profile bridge and MAP Lab AWS SSO profiles. On Ubuntu GNOME it also
+applies portable desktop appearance preferences and the bundled wallpaper.
 
 ## Install
 
@@ -97,6 +98,14 @@ user startup files; Bash and processes that do not launch zsh are not covered.
 Shims load mise environment variables for the tool they launch, not the parent
 shell. Use `mise exec -- <command>` when a whole command needs the project
 environment. See [mise's shim documentation](https://mise.jdx.dev/dev-tools/shims.html).
+
+## Desktop preferences
+
+PC setup owns intentional preferences that should carry across machines, while
+environment-specific configuration and incidental state remain local. Ubuntu's
+curated appearance profile includes dark mode, the blue accent, wallpaper, dock
+layout, and desktop special-icon visibility. See [desktop settings](docs/desktop-settings.md)
+for the scope, exclusions, and how to apply it independently of the bootstrap.
 
 ## Repository layout
 

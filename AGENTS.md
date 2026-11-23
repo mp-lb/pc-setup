@@ -4,7 +4,7 @@ This repository bootstraps MAP Lab development machines. The scripts support mac
 
 ## Boundary
 
-PC setup owns only the host substrate:
+PC setup owns the host substrate and portable desktop preferences:
 
 - OS package managers and host CLI tools
 - mise installation and global default tools
@@ -13,10 +13,19 @@ PC setup owns only the host substrate:
 - GitHub authentication and Git credential helper setup
 - the shell bridge that activates mise and adds MAP Lab helper scripts to PATH
 - doctor/inventory scripts for checking local machine state
+- intentional desktop preferences and their assets that should follow the user
+  across machines
 
 PC setup does not directly install language runtimes with `nvm`, `pyenv`, or
 `rbenv`. Runtime versions belong to mise. Project services, ports, env files,
 and tasks belong to Zapper.
+
+Capture reusable intent, not a snapshot of the current machine. Keep settings
+that remain meaningful when hardware, location, accounts, or session state
+change. Leave environment-specific configuration, secrets, generated state, and
+unrequested defaults local. Use a reviewed allowlist of settings; never commit
+an entire desktop configuration dump. Store required assets in the repo and
+resolve installation paths for the current user. See [desktop settings](docs/desktop-settings.md).
 
 ## Structure
 

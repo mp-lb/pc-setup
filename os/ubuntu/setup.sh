@@ -32,3 +32,11 @@ mise use --global --fuzzy overmind@latest
 source "$PC_SETUP_REPO_PATH/os/ubuntu/login-shell.sh"
 source "$PC_SETUP_REPO_PATH/lib/setup-user.sh"
 setup_user
+
+# Desktop preferences need the user's active GNOME session; headless installs
+# can apply them later with the standalone command.
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *GNOME* ]] && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+  bash "$PC_SETUP_REPO_PATH/os/ubuntu/apply-desktop-settings.sh"
+else
+  echo "Desktop settings skipped; run os/ubuntu/apply-desktop-settings.sh from GNOME later."
+fi
