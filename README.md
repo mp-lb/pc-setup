@@ -113,7 +113,7 @@ environment. See [mise's shim documentation](https://mise.jdx.dev/dev-tools/shim
 ./inventory.sh
 ```
 
-## Optional apps and containers
+## Containers and optional apps
 
 On macOS, install OrbStack separately:
 
@@ -121,10 +121,25 @@ On macOS, install OrbStack separately:
 brew bundle --file os/macos/Brewfile.apps
 ```
 
-On Ubuntu, install [Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/ubuntu/)
-if you need containers. Use `docker info` and `docker compose version` to verify
-that your normal account can use them. Ubuntu desktop apps are outside the
-base install.
+On Ubuntu, setup installs [Docker Engine](https://docs.docker.com/engine/install/ubuntu/),
+the Docker CLI, Buildx and Compose from Docker's signed apt repository. It starts
+Docker and containerd immediately and enables both systemd services at boot.
+Systemd manages daemon restarts using the packaged service restart policies.
+Setup adds your account to the `docker` group so Zapper can use the local daemon.
+Sign out and back in to activate that group in all apps, or run `newgrp docker`
+for access in the current terminal.
+
+To install Docker or restore daemon startup on an existing Ubuntu machine:
+
+```bash
+bash ~/Work/pc-setup/os/ubuntu/install-docker.sh
+```
+
+The installer refuses package changes that would remove an existing container
+runtime. If apt reports conflicting distro packages, follow Docker's migration
+instructions linked above before rerunning it. Doctor requires the local daemon,
+Compose and Buildx, and checks that Docker and containerd are running and enabled
+at boot. Ubuntu desktop apps remain outside the base install.
 
 ## Google Cloud CLI and Overmind
 
