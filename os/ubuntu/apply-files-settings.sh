@@ -55,10 +55,8 @@ if not backup.exists():
         'bookmarks': bookmarks.read_text() if bookmarks.exists() else None,
         'view': subprocess.check_output(['gsettings', 'get', *setting], text=True).strip(),
     }))
-desktop = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
 downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
-folders = [(Path(desktop or Path.home() / 'Desktop'), 'Desktop'),
-           (Path(downloads or Path.home() / 'Downloads'), 'Downloads'),
+folders = [(Path(downloads or Path.home() / 'Downloads'), 'Downloads'),
            (Path.home() / 'Work', 'Work')]
 for folder, _ in folders:
     folder.mkdir(parents=True, exist_ok=True)

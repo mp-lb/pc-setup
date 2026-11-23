@@ -40,10 +40,8 @@ class PcSetupSidebar(GObject.GObject, Nautilus.MenuProvider):
     def __init__(self):
         super().__init__()
         home = Path.home()
-        desktop = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
         downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
-        locations = [home.as_uri(), Path(desktop or home / "Desktop").as_uri(),
-                     Path(downloads or home / "Downloads").as_uri(),
+        locations = [home.as_uri(), Path(downloads or home / "Downloads").as_uri(),
                      (home / "Work").as_uri(), "x-network-view:///", "trash:///"]
         self.order = {uri: i for i, uri in enumerate(locations)}
         GLib.idle_add(self.start)

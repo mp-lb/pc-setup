@@ -77,9 +77,9 @@ reapplying restores the managed preferences.
 ## Files sidebar and list view
 
 The desktop installer also runs `os/ubuntu/apply-files-settings.sh`. It sets
-Nautilus's default to list view and replaces its bookmarks with Desktop,
-Downloads and Work (`~/Work`). A small user extension filters and orders the
-native sidebar rows: Home, Desktop, Downloads, Work, Network, Trash. The actual
+Nautilus's default to list view and replaces its bookmarks with Downloads and
+Work (`~/Work`). A small user extension filters and orders the
+native sidebar rows: Home, Downloads, Work, Network, Trash. The actual
 folders and normal navigation/context menus are preserved. Other sidebar entries,
 including mounted devices, are hidden; devices remain accessible through Network
 or their filesystem paths. Recent-file tracking is unchanged.
