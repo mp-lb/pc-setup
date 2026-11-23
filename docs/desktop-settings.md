@@ -74,6 +74,43 @@ wallpaper URIs. Other settings are preserved. Running it again is safe. Changes
 made later in Settings stay local until deliberately added to the profile;
 reapplying restores the managed preferences.
 
+## Files sidebar and list view
+
+The desktop installer also runs `os/ubuntu/apply-files-settings.sh`. It sets
+Nautilus's default to list view and replaces its bookmarks with Desktop,
+Downloads and Work (`~/Work`). A small user extension filters and orders the
+native sidebar rows: Home, Desktop, Downloads, Work, Network, Trash. The actual
+folders and normal navigation/context menus are preserved. Other sidebar entries,
+including mounted devices, are hidden; devices remain accessible through Network
+or their filesystem paths. Recent-file tracking is unchanged.
+
+This customization requires Ubuntu's `python3-nautilus` package and Nautilus 50.
+It uses internal sidebar widgets because Nautilus exposes no sidebar settings;
+review it when upgrading Nautilus. New windows and rebuilt rows are handled.
+The extension lives under `${XDG_DATA_HOME:-~/.local/share}/nautilus-python/extensions/`.
+The first apply saves the original bookmarks and default view under
+`${XDG_STATE_HOME:-~/.local/state}/pc-setup/files/`; reapplying preserves that backup.
+Folder-specific view overrides can still override the default list view.
+
+Apply just this preference, then close/reopen Files:
+
+```bash
+bash os/ubuntu/apply-files-settings.sh
+nautilus --quit
+nautilus --new-window "$HOME"
+```
+
+To remove the extension and restore the saved bookmarks/default view (this
+replaces any bookmark edits made since installation):
+
+```bash
+bash os/ubuntu/apply-files-settings.sh --remove
+nautilus --quit
+```
+
+Reapplying desktop settings installs the customization again. No folders or
+folder contents are deleted when applying or removing it.
+
 ## Optional Ubuntu Command trial
 
 The [Ubuntu Command tool](../os/ubuntu/command/README.md) uses a pinned Xremap binary

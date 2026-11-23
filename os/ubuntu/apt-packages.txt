@@ -5,6 +5,7 @@ gh
 git
 gnupg
 lsof
+python3-nautilus
 shellcheck
 tmux
 tree
