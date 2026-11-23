@@ -104,7 +104,7 @@ environment. See [mise's shim documentation](https://mise.jdx.dev/dev-tools/shim
 PC setup owns intentional preferences that should carry across machines, while
 environment-specific configuration and incidental state remain local. Ubuntu's
 curated appearance profile includes dark mode, the blue accent, wallpaper, dock
-layout, and desktop special-icon visibility. See [desktop settings](docs/desktop-settings.md)
+layout, IBM Plex fonts, and desktop special-icon visibility. See [desktop settings](docs/desktop-settings.md)
 for the scope, exclusions, and how to apply it independently of the bootstrap.
 
 ## Repository layout

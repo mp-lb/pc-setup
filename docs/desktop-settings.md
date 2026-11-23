@@ -15,9 +15,10 @@ own owner.
 
 `os/ubuntu/desktop/settings.ini` is a curated dconf profile relative to
 `/org/gnome/`. It records dark mode, the blue accent and matching Yaru themes,
-wallpaper rendering, and the customized dock: a full-width opaque bottom panel,
-centered icons and app-grid button, 24-pixel icons, always visible, on all
-monitors, with no trash icon. Showing the dock on every monitor is a portable
+IBM Plex Sans for interface/document text and bold window titles, IBM Plex Mono
+for monospace text (all at 11 points), wallpaper rendering, and the customized
+dock: a full-width opaque bottom panel, centered icons and app-grid button,
+24-pixel icons, always visible, on all monitors, with no trash icon. Showing the dock on every monitor is a portable
 policy; selecting a particular monitor is not.
 
 Desktop Icons NG hides its home, trash, mounted-volume, and network-volume icons.
@@ -35,6 +36,12 @@ other network configuration, audio devices and levels, and room/desk-specific
 choices. Search and notifications are not managed because they were not requested
 or customized as part of this profile.
 
+The bundled IBM Plex Sans and Mono fonts include all eight weights and italics,
+with their license and package provenance in `os/ubuntu/desktop/fonts/`. The
+installer copies them to `${XDG_DATA_HOME:-$HOME/.local/share}/fonts/pc-setup/`
+and refreshes the font cache without requiring administrator access. Apps with
+their own font preferences may need separate configuration or a restart.
+
 ## Apply
 
 From a logged-in Ubuntu GNOME session, as your regular user:
@@ -46,8 +53,8 @@ bash os/ubuntu/apply-desktop-settings.sh
 The Ubuntu bootstrap runs this automatically when invoked in a GNOME session.
 Headless installs skip it and print the command to run later. It targets the
 Ubuntu 26.04 desktop with Ubuntu Dock, Desktop Icons NG, and Yaru installed, and
-requires `dconf`, `gsettings`, and `python3`. Unsupported profile keys fail before
-preferences are written.
+requires `dconf`, `gsettings`, `python3`, and `fc-cache` (fontconfig). Unsupported
+profile keys fail before preferences are written.
 
 Applying the profile overwrites only its listed preferences and the three
 wallpaper URIs. Other settings are preserved. Running it again is safe. Changes

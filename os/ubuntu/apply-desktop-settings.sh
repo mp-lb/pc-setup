@@ -28,6 +28,8 @@ for section in profile.sections():
             sys.exit(f'Unsupported setting: {schema} {key}')
 PYTHON
 
+bash "$SCRIPT_DIR/install-desktop-fonts.sh"
+
 wallpaper_dir="${XDG_DATA_HOME:-$HOME/.local/share}/backgrounds/pc-setup"
 mkdir -p "$wallpaper_dir"
 install -m 644 "$SCRIPT_DIR/desktop/wallpaper.jpg" "$wallpaper_dir/wallpaper.jpg"
