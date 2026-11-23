@@ -24,8 +24,11 @@ Capture reusable intent, not a snapshot of the current machine. Keep settings
 that remain meaningful when hardware, location, accounts, or session state
 change. Leave environment-specific configuration, secrets, generated state, and
 unrequested defaults local. Use a reviewed allowlist of settings; never commit
-an entire desktop configuration dump. Store required assets in the repo and
-resolve installation paths for the current user. See [desktop settings](docs/desktop-settings.md).
+an entire desktop configuration dump. Store only assets suitable for public
+redistribution in this public repo and resolve installation paths for the
+current user. Keep purchased fonts and other
+private assets in a separate personal setup repository; do not make this
+bootstrap depend on access to it. See [desktop settings](docs/desktop-settings.md).
 
 ## Structure
 

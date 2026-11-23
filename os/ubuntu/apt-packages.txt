@@ -1,7 +1,6 @@
 awscli
 ca-certificates
 curl
-fontconfig
 gh
 git
 gnupg
