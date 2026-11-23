@@ -15,6 +15,7 @@ class Mapper:
         self.option = ALT if apple else SUPER
         self.held = set()  # (device, physical key), including both keyboards
         self.outputs = {}  # key-down mapping is retained until its matching key-up
+        self.requirements = {}  # synthetic modifiers needed by each held Command chord
         self.output_mods = set()
         self.command_mods = set()
         self.last_context = {}
@@ -28,6 +29,8 @@ class Mapper:
                    if code in MODIFIERS and code != self.command}
         if self.command in physical:
             desired |= self.command_mods
+            for modifiers in self.requirements.values():
+                desired |= modifiers
         releases = [(code, 0) for code in sorted(self.output_mods - desired)]
         presses = [(code, 1) for code in sorted(desired - self.output_mods)]
         self.output_mods = desired
@@ -36,12 +39,15 @@ class Mapper:
     def event(self, device, code, value):
         token = (device, code)
         if value == 2:  # repeat the original output, not a newly focused app's mapping
+            if token in self.requirements and self.command not in self._physical():
+                return []
             output = self.outputs.get(token)
             return [(output, 2)] if output is not None else []
         if value == 0:
             if token not in self.held:
                 return []
             self.held.remove(token)
+            self.requirements.pop(token, None)
             output = self.outputs.pop(token, None)
             result = []
             if output is not None and output not in self.outputs.values():
@@ -76,6 +82,7 @@ class Mapper:
                     code = Q  # GNOME Terminal: close window
             else:
                 self.command_mods = {CTRL}
+            self.requirements[token] = set(self.command_mods)
         already_down = code in self.outputs.values()
         self.outputs[token] = code
         return self._mods() + ([] if already_down else [(code, 1)])
@@ -85,6 +92,7 @@ class Mapper:
         result += [(code, 0) for code in sorted(self.output_mods)]
         self.held.clear()
         self.outputs.clear()
+        self.requirements.clear()
         self.output_mods.clear()
         self.command_mods.clear()
         return result

@@ -351,6 +351,25 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(self.key(m, SUPER), [])
         self.assertEqual(self.key(m, C)[-1], (INSERT, 1))
 
+    def test_overlapping_chord_cannot_turn_terminal_copy_repeat_into_interrupt(self):
+        m = self.make(True)
+        self.key(m, ALT)
+        self.key(m, C)
+        # A second chord must not drop the synthetic Shift needed by held C.
+        events = self.key(m, 30)  # Command+A before C has been released
+        self.assertNotIn((SHIFT, 0), events)
+        self.assertIn(SHIFT, m.output_mods)
+        self.assertEqual(self.key(m, C, 2), [(C, 2)])
+        self.key(m, ALT, 0)
+        self.assertEqual(self.key(m, C, 2), [])
+
+    def test_two_keyboards_holding_same_key_produce_one_press_and_release(self):
+        m = self.make()
+        self.assertEqual(self.key(m, C, device=1), [(C, 1)])
+        self.assertEqual(self.key(m, C, device=2), [])
+        self.assertEqual(self.key(m, C, 0, device=1), [])
+        self.assertEqual(self.key(m, C, 0, device=2), [(C, 0)])
+
 
 class DriverTests(unittest.TestCase):
     def test_privilege_drop_before_mapping_loop_and_fds_closed_on_crash(self):
