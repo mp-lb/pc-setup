@@ -28,7 +28,8 @@ an entire desktop configuration dump. Store only assets suitable for public
 redistribution in this public repo and resolve installation paths for the
 current user. Keep purchased fonts and other
 private assets in a separate personal setup repository; do not make this
-bootstrap depend on access to it. See [desktop settings](docs/desktop-settings.md).
+bootstrap depend on access to it. An optional authenticated installer may fetch
+a private repository only when accessible and must silently skip otherwise. See [desktop settings](docs/desktop-settings.md).
 
 ## Structure
 

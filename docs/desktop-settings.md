@@ -12,9 +12,24 @@ or temporary state on the machine. Application/project configuration retains its
 own owner.
 
 Personal fonts and other private assets belong in a separate personal setup
-repository. This public bootstrap neither fetches private font repositories nor
-changes interface, document, titlebar, or monospace font preferences. Existing
-font installations and preferences are preserved.
+repository. The public appearance profile does not manage font preferences.
+After the normal Ubuntu setup and GitHub authentication, an optional step checks
+access to the private `felixsebastian/ubuntu-fonts` repository. If inaccessible,
+it silently skips without changing fonts or requiring another login. If
+accessible and private, it clones or fast-forwards the checkout at
+`$PC_SETUP_WORKSPACE/ubuntu-fonts` (default `~/Work/ubuntu-fonts`) and runs its
+installer. Font files and personal font preferences live entirely in that
+private repo. Existing local changes or a different origin are never overwritten.
+
+The private installer supports installing font files in headless sessions and
+applying its preferences when run from GNOME. To retry just the optional step
+after GitHub authentication:
+
+```bash
+bash os/ubuntu/install-optional-fonts.sh
+```
+
+The shared appearance command below does not run this optional step.
 
 ## Ubuntu appearance
 

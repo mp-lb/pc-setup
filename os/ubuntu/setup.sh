@@ -40,3 +40,6 @@ if [[ "${XDG_CURRENT_DESKTOP:-}" == *GNOME* ]] && [ -n "${DBUS_SESSION_BUS_ADDRE
 else
   echo "Desktop settings skipped; run os/ubuntu/apply-desktop-settings.sh from GNOME later."
 fi
+
+# Authentication above enables optional personal fonts; no access means no-op.
+bash "$PC_SETUP_REPO_PATH/os/ubuntu/install-optional-fonts.sh"

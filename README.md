@@ -106,6 +106,9 @@ environment-specific configuration and incidental state remain local. Ubuntu's
 curated appearance profile includes dark mode, the blue accent, wallpaper, dock
 layout, and desktop special-icon visibility. See [desktop settings](docs/desktop-settings.md)
 for the scope, exclusions, and how to apply it independently of the bootstrap.
+Ubuntu setup also checks for access to an optional private font installer after
+GitHub authentication. Accounts without access silently skip it; no private
+assets or credentials are stored in this public repository.
 
 ## Repository layout
 
