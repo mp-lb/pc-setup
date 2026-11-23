@@ -42,6 +42,12 @@ PYTHON
 
 # dconf load merges only these keys; never reset the surrounding settings tree.
 dconf load /org/gnome/ < "$SCRIPT_DIR/desktop/settings.ini"
+# Keep the existing monospace preference unless the user's licensed font exists.
+if [ "$(fc-match -f '%{family}' 'Berkeley Mono')" = 'Berkeley Mono' ]; then
+  gsettings set org.gnome.desktop.interface monospace-font-name 'Berkeley Mono 11'
+else
+  echo "Berkeley Mono is not installed; keeping the current monospace font."
+fi
 gsettings set org.gnome.desktop.background picture-uri "$wallpaper_uri"
 gsettings set org.gnome.desktop.background picture-uri-dark "$wallpaper_uri"
 gsettings set org.gnome.desktop.screensaver picture-uri "$wallpaper_uri"

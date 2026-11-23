@@ -1,6 +1,6 @@
 # IBM Plex fonts
 
-Unmodified static IBM Plex Sans and Mono fonts from Ubuntu's
+Unmodified static IBM Plex Sans fonts from Ubuntu's
 `fonts-ibm-plex` package, version `6.1.1-1` (upstream: https://github.com/IBM/plex).
 All eight weights and their italics are included. See `COPYRIGHT` for attribution
 and the SIL Open Font License 1.1.
