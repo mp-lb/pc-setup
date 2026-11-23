@@ -73,3 +73,12 @@ Applying the profile overwrites only its listed preferences and the three
 wallpaper URIs. Other settings are preserved. Running it again is safe. Changes
 made later in Settings stay local until deliberately added to the profile;
 reapplying restores the managed preferences.
+
+## Optional Ubuntu Command trial
+
+The [Ubuntu Command tool](../os/ubuntu/command/README.md) provides a small,
+manually started macOS-style keyboard session for Ubuntu 26.04 / GNOME 50 on
+Wayland. It is not part of the default bootstrap. It uses no installed packages,
+persistent services, device-permission changes, or group memberships. Its README
+lists the exact user files and extension settings it owns, the uninstall command,
+and the current shortcut limitations.
