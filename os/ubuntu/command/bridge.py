@@ -1,7 +1,7 @@
-"""Xremap's desktop socket protocol, restricted to context and normal app quit.
+"""Xremap's desktop socket protocol, restricted to context, quit and screen lock.
 
 Runs as the logged-in user. Never opens input devices, executes supplied commands,
-or sends window titles. Root Xremap delegates its one launch action here.
+or sends window titles. Root Xremap delegates its allowlisted actions here.
 """
 import fcntl
 import json
@@ -10,10 +10,21 @@ from pathlib import Path
 import signal
 import socket
 import time
-from runtime import Runtime, context
+from runtime import Runtime, context, run
 
 
-def respond(request, get_context=context):
+def lock_screen():
+    # GNOME can defer its reply until the lock animation/grab completes. Do not
+    # stall keyboard context requests while waiting for that reply.
+    run(['/usr/bin/busctl', '--user', '--expect-reply=no', 'call',
+         'org.gnome.ScreenSaver', '/org/gnome/ScreenSaver', 'org.gnome.ScreenSaver', 'Lock'])
+
+
+def respond(request, get_context=context, lock=lock_screen):
+    # Locking must also work without a focused app or our GNOME extension.
+    if request == {'Run': ['ubuntu-command-lock']}:
+        lock()
+        return 'Ok'
     current = get_context()
     if request == 'ActiveWindow':
         return {'wm_class': '' if current['locked'] else current['wm_class'], 'title': ''}
@@ -88,7 +99,7 @@ def main():
                             reply = respond(request)
                     except Exception:
                         # Missing extension/context disables app-sensitive actions.
-                        reply = {'Error': 'Desktop context unavailable'}
+                        reply = {'Error': 'Desktop action unavailable'}
                     try:
                         client.sendall(json.dumps(reply).encode() + b'\n')
                     except OSError:

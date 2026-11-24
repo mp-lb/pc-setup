@@ -50,8 +50,10 @@ so it remains separate from the right-Control signal reserved for Command.
 - Command+W / Shift+Command+W: the application's Control+W / Control+Shift+W;
   recognized terminals use Ctrl+Shift+W / Ctrl+Shift+Q.
 - Command+T/N: Ctrl+Shift+T/N in recognized terminals.
+- Command+H: minimize the focused window (GNOME’s default Super+H binding).
+  This minimizes one window; macOS Hide can hide all windows of an app.
 - Command+Q: GNOME requests normal application quit, allowing save dialogs.
-- Control+Command+Q: lock the screen using GNOME's native screen-lock key.
+- Control+Command+Q: lock the screen through GNOME's screen-lock service.
   On a PC keyboard this is physical Control+left Alt+Q.
 - Physical Ctrl+Alt+Esc: emergency stop (Ctrl+Super+Esc also works).
 
@@ -60,10 +62,9 @@ Command holds a real Control modifier, so mouse clicks need no interception and
 ordinary shortcuts need no individual entries. While Command is held, terminal
 exceptions add Shift. Command+Tab releases that Control and holds Super for the
 native switcher until Command is released. Physical Control remains independent.
-The lock shortcut temporarily releases Command's Control signal and emits the
-native screen-lock key (Linux `KEY_COFFEE`, mapped to `XF86ScreenSaver`). Xremap
-also releases physical Control around that key, so GNOME receives an unmodified
-lock request. No GNOME keybindings are changed.
+The lock shortcut calls GNOME's `org.gnome.ScreenSaver.Lock` D-Bus method through
+the user bridge. Minimize temporarily releases Command's Control signal and
+emits GNOME's Super+H binding. No GNOME keybindings are changed.
 
 Embedded terminals inside editors/browsers follow their host application's
 Control shortcuts; they are not detected separately. Some terminals use different
@@ -96,8 +97,9 @@ Start creates two **transient** systemd units:
   socket, Unix sockets only, and input/uinput device access. It is tied to the
   graphical login session and stops on logout. It is not enabled at boot.
 - User `ubuntu-command-bridge.service`: a small Python socket adapter. It obtains
-  the focused app through our GNOME extension and accepts exactly one launch
-  request, `ubuntu-command-quit`. It never executes supplied commands, reads
+  the focused app through our GNOME extension and accepts exactly two launch
+  requests, `ubuntu-command-quit` and `ubuntu-command-lock`. The latter calls
+  a fixed GNOME D-Bus method. It never executes supplied commands, reads
   keyboard events, or sends window titles. It exits after observing Xremap stop.
 
 The socket-mode Xremap client delegates launch requests to this adapter; it does

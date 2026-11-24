@@ -376,7 +376,7 @@ def preflight():
         raise RuntimeError('This version supports the Ubuntu GNOME Wayland session only.')
     if not command(['gnome-shell', '--version']).split()[-1].startswith('50.'):
         raise RuntimeError('This first version targets GNOME 50; other releases need explicit testing.')
-    for name in ('gdbus', 'gsettings', 'dconf', 'pkexec', 'systemd-run', 'systemctl', 'loginctl', 'gnome-extensions'):
+    for name in ('gdbus', 'busctl', 'gsettings', 'dconf', 'pkexec', 'systemd-run', 'systemctl', 'loginctl', 'gnome-extensions'):
         if not shutil.which(name):
             raise RuntimeError(f'Missing prerequisite: {name}. No packages will be installed automatically.')
     if not Path('/dev/uinput').exists():

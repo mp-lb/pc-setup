@@ -399,7 +399,7 @@ class XremapTests(unittest.TestCase):
         self.assertLess(actions.index({'release': 'Ctrl_R'}), actions.index({'press': 'Super_L'}))
         self.assertNotIn({'release': 'Super_L'}, actions)
 
-    def test_lock_chord_is_distinct_from_quit_and_releases_command_control(self):
+    def test_lock_chord_is_distinct_from_quit(self):
         keymaps = json.loads((SOURCE/'config.json').read_text())['keymap']
         lock = next(item for item in keymaps if 'Ctrl-q' in item['remap'])
         quit_app = next(item for item in keymaps if 'q' in item['remap'])
@@ -407,8 +407,7 @@ class XremapTests(unittest.TestCase):
         self.assertTrue(lock['exact_match'])
         self.assertNotIn('application', lock)  # Also works with no focused window.
         self.assertLess(keymaps.index(lock), keymaps.index(quit_app))
-        self.assertEqual(lock['remap']['Ctrl-q'], [
-            {'release': 'Ctrl_R'}, 'KEY_COFFEE', {'press': 'Ctrl_R'}])
+        self.assertEqual(lock['remap']['Ctrl-q'], {'launch': ['ubuntu-command-lock']})
         self.assertEqual(quit_app['remap']['q'], {'launch': ['ubuntu-command-quit']})
 
     def test_bridge_never_executes_arbitrary_launches_and_hides_locked_context(self):
@@ -424,6 +423,18 @@ class XremapTests(unittest.TestCase):
         locked = lambda *args: {'locked': True, 'wm_class': 'private'}
         self.assertEqual(respond('ActiveWindow', locked)['wm_class'], '')
         self.assertIn('Error', respond({'Run': ['ubuntu-command-quit']}, locked))
+
+    def test_lock_uses_fixed_user_session_call_even_without_extension(self):
+        def unavailable(*args):
+            raise RuntimeError('GNOME extension unavailable')
+        with patch('bridge.run', return_value='()') as run:
+            self.assertEqual(respond({'Run': ['ubuntu-command-lock']}, unavailable), 'Ok')
+        run.assert_called_once_with([
+            '/usr/bin/busctl', '--user', '--expect-reply=no', 'call',
+            'org.gnome.ScreenSaver', '/org/gnome/ScreenSaver', 'org.gnome.ScreenSaver', 'Lock'])
+        with patch('bridge.run', side_effect=RuntimeError('D-Bus failed')):
+            with self.assertRaisesRegex(RuntimeError, 'D-Bus failed'):
+                respond({'Run': ['ubuntu-command-lock']}, unavailable)
 
     def test_system_service_is_transient_sandboxed_and_tied_to_login(self):
         runtime = Runtime(Path('/tmp/app with spaces'))
@@ -500,7 +511,7 @@ class LocalRuntime:
     def state(self): return {'LoadState':'loaded'}
 bridge.Runtime=LocalRuntime
 original=bridge.respond
-bridge.respond=lambda request:original(request,lambda *a:{'locked':False,'wm_class':'kitty'})
+bridge.respond=lambda request:original(request,lambda *a:{'locked':False,'wm_class':'kitty'},lambda:(LocalRuntime.app/'locked').touch())
 bridge.main()
 '''
             process = subprocess.Popen([sys.executable,'-B','-c',script,str(SOURCE),str(root)], stderr=subprocess.PIPE)
@@ -514,12 +525,15 @@ bridge.main()
                 # A client that stalls must not kill the bridge.
                 with socket.socket(socket.AF_UNIX) as client:
                     client.connect(str(path)); time.sleep(.7)
-                for request in ['ActiveWindow', {'Run':['/bin/sh']}]:
+                for request in ['ActiveWindow', {'Run':['ubuntu-command-lock']}, {'Run':['/bin/sh']}]:
                     with socket.socket(socket.AF_UNIX) as client:
                         client.settimeout(3); client.connect(str(path))
                         client.sendall(json.dumps(request).encode()+b'\n')
                         response=json.loads(client.recv(4096))
                     if request=='ActiveWindow': self.assertEqual(response['wm_class'],'kitty')
+                    elif request=={'Run':['ubuntu-command-lock']}:
+                        self.assertEqual(response,'Ok')
+                        self.assertTrue((root/'locked').exists())
                     else: self.assertIn('Error',response)
                 with (root/'run.lock').open() as lock:
                     with self.assertRaises(BlockingIOError):

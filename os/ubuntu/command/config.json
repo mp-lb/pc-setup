@@ -25,11 +25,23 @@
       "mode": "command",
       "exact_match": true,
       "remap": {
-        "Ctrl-q": [
+        "Ctrl-q": {
+          "launch": [
+            "ubuntu-command-lock"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Command H minimizes the focused window",
+      "mode": "command",
+      "exact_match": true,
+      "remap": {
+        "h": [
           {
             "release": "Ctrl_R"
           },
-          "KEY_COFFEE",
+          "Super_L-h",
           {
             "press": "Ctrl_R"
           }
