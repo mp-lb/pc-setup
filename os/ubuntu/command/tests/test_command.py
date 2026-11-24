@@ -399,6 +399,18 @@ class XremapTests(unittest.TestCase):
         self.assertLess(actions.index({'release': 'Ctrl_R'}), actions.index({'press': 'Super_L'}))
         self.assertNotIn({'release': 'Super_L'}, actions)
 
+    def test_lock_chord_is_distinct_from_quit_and_releases_command_control(self):
+        keymaps = json.loads((SOURCE/'config.json').read_text())['keymap']
+        lock = next(item for item in keymaps if 'Ctrl-q' in item['remap'])
+        quit_app = next(item for item in keymaps if 'q' in item['remap'])
+        self.assertEqual(lock['mode'], 'command')
+        self.assertTrue(lock['exact_match'])
+        self.assertNotIn('application', lock)  # Also works with no focused window.
+        self.assertLess(keymaps.index(lock), keymaps.index(quit_app))
+        self.assertEqual(lock['remap']['Ctrl-q'], [
+            {'release': 'Ctrl_R'}, 'KEY_COFFEE', {'press': 'Ctrl_R'}])
+        self.assertEqual(quit_app['remap']['q'], {'launch': ['ubuntu-command-quit']})
+
     def test_bridge_never_executes_arbitrary_launches_and_hides_locked_context(self):
         calls = []
         def context(method='Context'):

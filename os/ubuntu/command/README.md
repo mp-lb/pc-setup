@@ -51,6 +51,8 @@ so it remains separate from the right-Control signal reserved for Command.
   recognized terminals use Ctrl+Shift+W / Ctrl+Shift+Q.
 - Command+T/N: Ctrl+Shift+T/N in recognized terminals.
 - Command+Q: GNOME requests normal application quit, allowing save dialogs.
+- Control+Command+Q: lock the screen using GNOME's native screen-lock key.
+  On a PC keyboard this is physical Control+left Alt+Q.
 - Physical Ctrl+Alt+Esc: emergency stop (Ctrl+Super+Esc also works).
 
 The JSON files use upstream Xremap's press/release actions and modes. Pressing
@@ -58,7 +60,10 @@ Command holds a real Control modifier, so mouse clicks need no interception and
 ordinary shortcuts need no individual entries. While Command is held, terminal
 exceptions add Shift. Command+Tab releases that Control and holds Super for the
 native switcher until Command is released. Physical Control remains independent.
-No GNOME keybindings are changed.
+The lock shortcut temporarily releases Command's Control signal and emits the
+native screen-lock key (Linux `KEY_COFFEE`, mapped to `XF86ScreenSaver`). Xremap
+also releases physical Control around that key, so GNOME receives an unmodified
+lock request. No GNOME keybindings are changed.
 
 Embedded terminals inside editors/browsers follow their host application's
 Control shortcuts; they are not detected separately. Some terminals use different

@@ -21,6 +21,22 @@
       }
     },
     {
+      "name": "Control Command Q locks the screen",
+      "mode": "command",
+      "exact_match": true,
+      "remap": {
+        "Ctrl-q": [
+          {
+            "release": "Ctrl_R"
+          },
+          "KEY_COFFEE",
+          {
+            "press": "Ctrl_R"
+          }
+        ]
+      }
+    },
+    {
       "name": "Hold the native app switcher until Command is released",
       "mode": "command",
       "remap": {
