@@ -219,8 +219,21 @@ class InstallTests(unittest.TestCase):
 
     def test_python_bytecode_not_in_installed_payload(self):
         self.install.install()
+        # Exercise runtime import in a fresh Python process without -B, as the
+        # old desktop launcher did. The controller must suppress cache writes.
+        env = dict(os.environ)
+        env.pop('PYTHONDONTWRITEBYTECODE', None)
+        env.pop('PYTHONPYCACHEPREFIX', None)
+        subprocess.run([sys.executable, '-c',
+                        'import runpy,sys; sys.path.insert(0,sys.argv[1]); '
+                        'runpy.run_path(sys.argv[1]+"/control.py")["Install"]()',
+                        str(self.install.app)], env=env, check=True, timeout=10)
+        entries = [line for line in self.install.launcher.read_text().splitlines() if line.startswith('Exec=')]
+        self.assertEqual(len(entries), 3)
+        self.assertTrue(all(line.startswith('Exec=/usr/bin/python3 -B ') for line in entries))
         self.assertEqual({p.name for p in self.install.app.iterdir()}, set(APP_FILES) | {'run.lock'})
         self.install.uninstall()
+        self.assertEqual(snapshot(self.root), {})
 
     def test_failed_initial_manifest_write_leaves_nothing(self):
         with patch.object(self.install, 'save', side_effect=OSError('disk full')):

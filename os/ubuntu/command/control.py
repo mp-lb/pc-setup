@@ -20,6 +20,10 @@ import time
 import urllib.request
 import zipfile
 
+# Direct invocation must be as clean as the launcher: importing our runtime
+# must not create unrecorded files that would prevent a safe uninstall.
+sys.dont_write_bytecode = True
+
 UUID = 'ubuntu-command@mp-lb.dev'
 SCHEMA = 'org.gnome.shell'
 KEYS = ('enabled-extensions', 'disabled-extensions')
@@ -124,12 +128,12 @@ class Install:
         payload['app/run.lock'] = b''
         payload['launcher'] = ('[Desktop Entry]\nType=Application\nName=Ubuntu Command\n'
                               'Comment=Start Mac-style shortcuts with Xremap\n'
-                              f'Exec=/usr/bin/python3 "{executable}" start --notify\n'
+                              f'Exec=/usr/bin/python3 -B "{executable}" start --notify\n'
                               'Terminal=false\nCategories=Utility;\nActions=Stop;Uninstall;\n\n'
                               '[Desktop Action Stop]\nName=Stop shortcuts\n'
-                              f'Exec=/usr/bin/python3 "{executable}" stop --notify\n\n'
+                              f'Exec=/usr/bin/python3 -B "{executable}" stop --notify\n\n'
                               '[Desktop Action Uninstall]\nName=Uninstall Ubuntu Command\n'
-                              f'Exec=/usr/bin/python3 "{executable}" uninstall --notify\n').encode()
+                              f'Exec=/usr/bin/python3 -B "{executable}" uninstall --notify\n').encode()
         return payload
 
     def path_for(self, label):
