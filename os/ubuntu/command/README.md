@@ -38,31 +38,48 @@ certification. Updating Xremap requires an intentional version/checksum update.
 
 PC keyboards: left Alt becomes Command, left Super becomes Option/Alt. Apple
 keyboards with `--apple`: existing left Command and Option positions are retained.
-Right modifiers, including AltGr, are unchanged.
+AltGr and right Super are unchanged. Physical right Control sends left Control
+so it remains separate from the right-Control signal reserved for Command.
 
-- Command+Tab / Shift+Command+Tab: existing GNOME application switching.
-- Command+C/V: Ctrl+Shift+C/V in recognized terminals. Other apps receive
-  Ctrl+Insert / Shift+Insert, which also work in many embedded terminals.
-- Control+C remains Control+C, including terminal interrupt.
-- Command+W: close tab/document. Shift+Command+W: close window using the app's
-  conventional binding; terminal variants use terminal bindings.
+- Command behaves as Control by default, including Command-click, copy/paste,
+  select all, undo, find, save, new tabs, and app-specific Control shortcuts.
+- Command+Tab / Shift+Command+Tab: native GNOME application switching. Keep
+  Command held and tap Tab to cycle; release Command to select.
+- Command+C/V: Ctrl+Shift+C/V in recognized standalone terminals.
+- Physical Control+C remains Control+C, including terminal interrupt.
+- Command+W / Shift+Command+W: the application's Control+W / Control+Shift+W;
+  recognized terminals use Ctrl+Shift+W / Ctrl+Shift+Q.
+- Command+T/N: Ctrl+Shift+T/N in recognized terminals.
 - Command+Q: GNOME requests normal application quit, allowing save dialogs.
-- Command+A/X/Z/T/F/S/N/O/P/L: the corresponding Control shortcut, with terminal
-  overrides for new tab/window. Extra Shift is preserved by Xremap.
 - Physical Ctrl+Alt+Esc: emergency stop (Ctrl+Super+Esc also works).
 
-The JSON files are Xremap configuration, not our own mapping code. Only the
-listed shortcuts are translated. Unknown shortcuts pass through. Some apps do
-not support Insert-based clipboard shortcuts or GNOME's quit request; these
-need explicit application exceptions after testing. Repeated quit requests within
-one second are collapsed to avoid quitting successive apps during ordinary key
-repeat; unusually slow repeat settings still need care. Non-US layouts, unusual
-keyboards and application-specific behavior require a live trial. Xremap watches
-for newly connected keyboards. Grabbing input can affect touchpad
+The JSON files use upstream Xremap's press/release actions and modes. Pressing
+Command holds a real Control modifier, so mouse clicks need no interception and
+ordinary shortcuts need no individual entries. While Command is held, terminal
+exceptions add Shift. Command+Tab releases that Control and holds Super for the
+native switcher until Command is released. Physical Control remains independent.
+No GNOME keybindings are changed.
+
+Embedded terminals inside editors/browsers follow their host application's
+Control shortcuts; they are not detected separately. Some terminals use different
+bindings and some apps do not support GNOME's quit request. Repeated quit requests
+within one second are collapsed to avoid quitting successive apps during ordinary
+key repeat; unusually slow repeat settings still need care. Non-US layouts,
+unusual keyboards and application-specific behavior require a live trial.
+Xremap watches for newly connected keyboards. Grabbing input can affect touchpad
 "disable while typing"; no libinput workaround is installed.
 
-If GNOME context disappears or the desktop locks, application-sensitive shortcut
-translation is disabled. The physical Alt/Super swap remains until Xremap stops.
+If GNOME context disappears or the desktop locks, terminal and quit exceptions
+are disabled. The base Command-to-Control mapping remains until Xremap stops.
+Consequently Command+C can interrupt a terminal if its context is unavailable.
+
+### Try a changed configuration or roll back
+
+Stop, uninstall, then install the chosen source revision and start again. Do not
+edit installed JSON files directly: their recorded hashes protect uninstall from
+deleting modifications. A full reinstall records the chosen configuration in the
+same recovery manifest and retains the normal uninstall guarantees. There is no
+configuration auto-reload while keys are held.
 
 ## Background operation and privilege boundary
 

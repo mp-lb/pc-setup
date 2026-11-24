@@ -1,1 +1,32 @@
-{}
+{
+  "modmap": [
+    {
+      "name": "Command uses Control by default",
+      "remap": {
+        "Super_L": {
+          "skip_key_event": true,
+          "press": [
+            {
+              "press": "Ctrl_R"
+            },
+            {
+              "set_mode": "command"
+            }
+          ],
+          "release": [
+            {
+              "release": "Ctrl_R"
+            },
+            {
+              "release": "Super_L"
+            },
+            {
+              "set_mode": "default"
+            }
+          ]
+        },
+        "Ctrl_R": "Ctrl_L"
+      }
+    }
+  ]
+}

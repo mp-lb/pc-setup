@@ -284,7 +284,11 @@ from control import Install, Desktop, UUID, KEYS, publish, APP_FILES, engine_pay
 root=Path(sys.argv[2])
 desktop=Desktop()
 before={k:desktop.read(k) for k in KEYS}
-install=Install(root/'data',root/'state',desktop,Path(sys.argv[1]),engine=b'fake-engine')
+# This test isolates real dconf, not the host's running keyboard service.
+class IsolatedRuntime:
+    def ensure_absent(self): pass
+    def stop(self): pass
+install=Install(root/'data',root/'state',desktop,Path(sys.argv[1]),engine=b'fake-engine',runtime=IsolatedRuntime())
 install.install()
 command(['gsettings','set','org.gnome.shell','enabled-extensions',repr(['another-extension',UUID])])
 command(['gsettings','set','org.gnome.shell','disabled-extensions',repr([UUID])])
@@ -361,12 +365,26 @@ class XremapTests(unittest.TestCase):
     def test_terminal_copy_and_interrupt_are_separate(self):
         config = json.loads((SOURCE/'config.json').read_text())
         terminal = next(item for item in config['keymap'] if item['name'].startswith('Terminal'))
-        self.assertEqual(terminal['remap']['Super_L-c'], 'Ctrl-Shift-c')
-        self.assertEqual(terminal['remap']['Super_L-v'], 'Ctrl-Shift-v')
+        self.assertEqual(terminal['mode'], 'command')
+        self.assertEqual(terminal['remap']['c'], 'Shift-c')
+        self.assertEqual(terminal['remap']['v'], 'Shift-v')
         self.assertFalse(any('Ctrl-c' in item['remap'] for item in config['keymap']))
-        common = config['keymap'][-1]
-        self.assertEqual(common['remap']['Super_L-c'], 'Ctrl-Insert')
-        self.assertIn('application', common)  # Missing desktop context cannot synthesize Ctrl+C.
+        for profile, command_key in (('pc', 'Alt_L'), ('apple', 'Super_L')):
+            remap = json.loads((SOURCE/(profile+'.json')).read_text())['modmap'][0]['remap']
+            command = remap[command_key]
+            self.assertIn({'press': 'Ctrl_R'}, command['press'])
+            self.assertIn({'release': 'Ctrl_R'}, command['release'])
+            self.assertIn({'release': 'Super_L'}, command['release'])
+            self.assertIn({'set_mode': 'default'}, command['release'])
+            self.assertEqual(remap['Ctrl_R'], 'Ctrl_L')
+            self.assertNotIn('Ctrl_L', remap)
+            self.assertNotIn('Alt_R', remap)
+        # App switching must hold Super across repeated Tabs, not emit a tap
+        # that selects immediately. Command release above is the cleanup.
+        switcher = next(item for item in config['keymap'] if item.get('mode') == 'command' and 'Tab' in item['remap'])
+        actions = switcher['remap']['Tab']
+        self.assertLess(actions.index({'release': 'Ctrl_R'}), actions.index({'press': 'Super_L'}))
+        self.assertNotIn({'release': 'Super_L'}, actions)
 
     def test_bridge_never_executes_arbitrary_launches_and_hides_locked_context(self):
         calls = []
