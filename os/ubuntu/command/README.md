@@ -1,13 +1,34 @@
-# Ubuntu Command
+# Gnome MacLike
 
-An optional macOS-style shortcut setup for Ubuntu 26.04, GNOME 50 and Wayland.
+An optional native GTK/libadwaita dashboard for Ubuntu 26.04, GNOME 50 and Wayland:
+keyboard layers, a local wallpaper gallery, a bottom-panel dock preset, and explicit
+restore/uninstall controls. This is a first local version, not a new distribution.
 **Xremap handles all keyboard input.** Our code installs a pinned upstream binary,
 manages its lifetime, and supplies a small GNOME adapter for application context
 and normal application quit. There is no custom keyboard driver or mapping engine.
 
 ## Install and use
 
-Run as your normal user from this directory:
+Open the GUI as your normal user from this directory:
+
+```sh
+python3 -B gui.py
+```
+
+Choose **Install** (or **Update installation** for the previous trial), then
+**Apply and start** on the Keyboard page. Ubuntu's normal authentication dialog
+handles starting/stopping the privileged remapper. Updates fetch and verify the
+new binary before removing the old installation, then restore old managed
+settings and install inactive; saved layer choices reset. No terminal is needed
+after installation: open **Gnome MacLike** from the applications menu.
+
+The host must already provide Python GObject, GTK 4 and libadwaita 1.5+. No packages
+are installed. Keyboard remapping runs independently of the window: closing the
+dashboard does not stop it. **Stop** restores the original keyboard behavior.
+Nothing starts automatically at login. GUI controls and generated configurations
+do not overwrite any GNOME keybinding settings.
+
+The backend CLI remains available for recovery and automation:
 
 ```sh
 python3 -B control.py install
@@ -17,8 +38,7 @@ python3 -B control.py uninstall
 ```
 
 First installation may require logging out and back in so GNOME recognizes the
-extension. Launch **Ubuntu Command** from the applications menu after that.
-There is no terminal to keep open. Its launcher also has Stop and Uninstall actions.
+extension. Its launcher also has Stop and Uninstall actions.
 Use `start --apple` for an Apple keyboard; the default is a PC keyboard.
 Installation is inactive, and startup is manual on every login.
 
@@ -33,6 +53,40 @@ extracting the single binary. `install --archive /path/to/release.zip` uses a
 local copy with the same verification. The MIT license is included. This checks
 integrity against our pinned upstream release; it is not an independent security
 certification. Updating Xremap requires an intentional version/checksum update.
+
+## Dashboard layers and appearance
+
+Five switches control the Command-position mapping, separate physical Control,
+terminal shortcuts, desktop shortcuts, and text navigation. Disabling Command
+disables all dependent mappings. Disabling terminal shortcuts does not remove the
+physical-Control safety exception for standalone terminals. Application exclusions
+(including a Chrome/Chromium convenience switch) disable optional shortcuts in
+those apps while keeping the base modifier mapping and emergency stop. This is
+not widget detection and adds no browser-specific remapping rules.
+
+Text navigation translates Command+Left/Right to Home/End, Command+Up/Down to
+Control+Home/End, and Option+Left/Right to Control+Left/Right. Shift variants select
+text. These are generic mappings, including outside text fields; Option arrows
+replace normal Linux browser back/forward navigation. Specialized editors and
+terminal programs can interpret these keys differently. Turn the layer off or
+exclude an app rather than adding an open-ended collection of exceptions.
+
+The gallery reads local JPEG/PNG/WebP images, shows resolution, filters for at
+least 5120×2880 landscape images, and previews before applying. A folder can show
+up to 200 candidate files. Images stay at their original paths: do not move or
+delete an active wallpaper. Choosing a folder alone never changes the wallpaper.
+Images are not copied, uploaded, bundled, or assigned new licenses. Filenames
+are display labels, not independently verified author credits.
+
+The dock preset changes only position, full-width layout, centered icons and
+fixed visibility in the existing Ubuntu Dock / Dash to Dock extension. Plain
+GNOME without that extension reports the missing capability instead of installing
+another extension. Wallpapers set only the light/dark background URI and zoom.
+
+Before the first appearance change, the app records each original raw dconf value,
+including whether the key was unset. Restore returns those values, not factory
+defaults. Newer external edits are preserved and reported. The write-ahead journal
+survives partial failures. Restore and uninstall keep it until restoration succeeds.
 
 ## Shortcuts
 
@@ -54,6 +108,7 @@ Control signal so terminal interrupts and Command shortcuts remain distinct.
 - Command+W / Shift+Command+W: the application's Control+W / Control+Shift+W;
   recognized terminals use Ctrl+Shift+W / Ctrl+Shift+Q.
 - Command+T/N: Ctrl+Shift+T/N in recognized terminals.
+- Command+arrows / Option+Left/Right: text navigation, with Shift selection.
 - Command+H: minimize the focused window (GNOME’s default Super+H binding).
   This minimizes one window; macOS Hide can hide all windows of an app.
 - Command+Q: GNOME requests normal application quit, allowing save dialogs.
@@ -133,11 +188,14 @@ The persistent footprint is:
 - `${XDG_DATA_HOME}/gnome-shell/extensions/ubuntu-command@mp-lb.dev/`: JS and metadata.
 - `${XDG_DATA_HOME}/applications/ubuntu-command.desktop`.
 - `${XDG_STATE_HOME:-~/.local/state}/ubuntu-command/`: recovery manifest and
-  operation lock, plus staging files during installation.
+  operation lock, mutable `preferences.json` for layer/gallery choices, and
+  `appearance.json` for original/applied allowlisted desktop settings. Atomic
+  writes may leave recoverable staging files during an interruption.
 - Only our UUID membership in GNOME's enabled/disabled extension lists.
 
 While running, systemd additionally owns the two transient unit definitions and
-`/run/user/<uid>/ubuntu-command/desktop.sock`. Service stop/collection removes
+`/run/user/<uid>/ubuntu-command/desktop.sock`, generated `active.json` and a copy of
+the active preferences. Service stop/collection removes
 these. The kernel releases keyboard grabs and destroys the virtual device when
 Xremap exits. Uninstall checks service identity and waits for both units and the
 runtime directory to disappear **before removing installed files**. A denied
@@ -177,3 +235,12 @@ These checks do not establish real keyboard behavior or prove the privileged
 service sandbox works on this host. A fresh login and actual keyboard trial are
 still required, followed by uninstall of that active trial. Inactive
 install/uninstall results must be reported separately from that trial.
+
+The dashboard tests additionally cover every layer/hardware combination with the
+real parser, appearance restoration against private dconf, external-edit
+preservation, rejected preferences, interrupted writes, and uninstall with saved
+choices. For a non-mutating visual check of the actual GTK pages:
+
+```sh
+GSK_RENDERER=cairo python3 -B os/ubuntu/command/tests/gui_smoke.py /tmp/gnome-mac-preview
+```

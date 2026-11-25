@@ -32,7 +32,8 @@ ARCHIVES = {
     'x86_64': '61db029d4ee19b9431120ab740574b9b0d2740d9b5b98bbc3375601fdf2687d3',
     'aarch64': 'a0f1cf1428c8a60d95009519cffc2971bbcf695564ea1fcd5e95aa3719dd69b0',
 }
-APP_FILES = ('control.py', 'runtime.py', 'bridge.py', 'config.json', 'pc.json', 'apple.json', 'xremap', 'XREMAP-LICENSE')
+APP_FILES = ('control.py', 'runtime.py', 'bridge.py', 'profiles.py', 'preferences.py', 'dashboard.py', 'gui.py',
+             'config.json', 'pc.json', 'apple.json', 'xremap', 'XREMAP-LICENSE')
 
 
 def engine_payload(archive=None):
@@ -125,14 +126,16 @@ class Install:
         for name in ('metadata.json', 'extension.js'):
             payload['extension/' + name] = (self.source / 'extension' / name).read_bytes()
         executable = str(self.app / 'control.py').replace('\\', '\\\\').replace('"', '\\"')
+        gui = str(self.app / 'gui.py').replace('\\', '\\\\').replace('"', '\\"')
         payload['app/run.lock'] = b''
-        payload['launcher'] = ('[Desktop Entry]\nType=Application\nName=Ubuntu Command\n'
-                              'Comment=Start Mac-style shortcuts with Xremap\n'
-                              f'Exec=/usr/bin/python3 -B "{executable}" start --notify\n'
-                              'Terminal=false\nCategories=Utility;\nActions=Stop;Uninstall;\n\n'
+        payload['launcher'] = ('[Desktop Entry]\nType=Application\nName=Gnome MacLike\n'
+                              'Comment=Familiar shortcuts, wallpapers and dock, with restore controls\n'
+                              f'Exec=/usr/bin/python3 -B "{gui}"\n'
+                              'Icon=preferences-desktop-keyboard-shortcuts\nStartupWMClass=dev.mplb.GnomeMacLike\n'
+                              'Terminal=false\nCategories=Settings;Utility;\nActions=Stop;Uninstall;\n\n'
                               '[Desktop Action Stop]\nName=Stop shortcuts\n'
                               f'Exec=/usr/bin/python3 -B "{executable}" stop --notify\n\n'
-                              '[Desktop Action Uninstall]\nName=Uninstall Ubuntu Command\n'
+                              '[Desktop Action Uninstall]\nName=Uninstall Gnome MacLike\n'
                               f'Exec=/usr/bin/python3 -B "{executable}" uninstall --notify\n').encode()
         return payload
 
@@ -287,6 +290,7 @@ class Install:
             raise RuntimeError('A session is still running; installation preserved.')
 
     def uninstall(self):
+        from preferences import FILES, Appearance, validate_state
         if not self.record.exists():
             if any(os.path.lexists(path) for path in (*self.roots.values(), self.record_dir)):
                 raise RuntimeError('Owned-looking files exist without a manifest; refusing to guess.')
@@ -318,8 +322,12 @@ class Install:
                             hashlib.sha256(path.read_bytes()).hexdigest() != digest):
                         raise RuntimeError(f'Modified file preserved; restore or move it before retrying: {path}')
                 for child in self.record_dir.iterdir():
-                    if child.name not in ('manifest.json', 'operation.lock', 'staging') and not child.name.startswith('.manifest-'):
+                    if child.name not in ('manifest.json', 'operation.lock', 'staging', *FILES) and not child.name.startswith(('.manifest-', '.settings-')):
                         raise RuntimeError(f'Unexpected recovery file preserved: {child}')
+                validate_state(self.record_dir)
+                preserved = Appearance(self.record_dir).restore()
+                if preserved:
+                    print('Preserved newer external desktop changes: ' + ', '.join(preserved))
                 self.desktop.disable()
                 for key in KEYS:
                     self.desktop.restore(key, info['desktop'][key])
@@ -336,6 +344,10 @@ class Install:
                     shutil.rmtree(staging)
                 for temporary in self.record_dir.glob('.manifest-*'):
                     temporary.unlink()
+                for temporary in self.record_dir.glob('.settings-*'):
+                    temporary.unlink()
+                for name in FILES:
+                    (self.record_dir / name).unlink(missing_ok=True)
                 self.record.unlink()
                 (self.record_dir / 'operation.lock').unlink(missing_ok=True)
                 self.record_dir.rmdir()
@@ -352,6 +364,7 @@ class Install:
         print('Uninstalled. Session stopped, extension/settings restored, owned files removed.')
 
     def start(self, apple=False):
+        from preferences import read_preferences
         with self.operation():
             info = self.load()
             if info['version'] != 2:
@@ -364,11 +377,23 @@ class Install:
             self.desktop.enable()
             # Fail before requesting administrator access if GNOME hasn't loaded us.
             self.runtime.context()
-            self.runtime.start(apple)
+            preferences = read_preferences(self.record_dir)
+            if apple:
+                preferences['keyboard'] = 'apple'
+            self.runtime.start(preferences['keyboard'] == 'apple', preferences=preferences)
         print('Xremap is running in the background. Physical Ctrl+Alt+Esc stops it.')
 
 
 def preflight():
+    try:
+        import gi
+        gi.require_version('Gtk', '4.0')
+        gi.require_version('Adw', '1')
+        from gi.repository import Adw
+        if Adw.get_major_version() == 1 and Adw.get_minor_version() < 5:
+            raise RuntimeError('The dashboard requires libadwaita 1.5 or newer.')
+    except (ImportError, ValueError) as exc:
+        raise RuntimeError('The dashboard requires Python GObject, GTK 4 and libadwaita. No packages were installed.') from exc
     release = dict(line.split('=', 1) for line in Path('/etc/os-release').read_text().splitlines() if '=' in line)
     if release.get('ID', '').strip('"') != 'ubuntu' or platform.machine() not in ('x86_64', 'aarch64'):
         raise RuntimeError('This version supports 64-bit Ubuntu only.')
@@ -410,20 +435,20 @@ def main():
         print('Session running' if install.runtime.running() or list(install.sessions()) else 'No running session')
     if args.notify:
         notify({'start': 'Shortcuts are running. Ctrl+Alt+Esc stops them.',
-                'stop': 'Shortcuts stopped.', 'uninstall': 'Ubuntu Command removed.'}.get(args.action, 'Done.'))
+                'stop': 'Shortcuts stopped.', 'uninstall': 'Gnome MacLike removed.'}.get(args.action, 'Done.'))
     return 0
 
 
 def notify(message):
     if shutil.which('notify-send'):
-        subprocess.run(['notify-send', 'Ubuntu Command', message], check=False)
+        subprocess.run(['notify-send', 'Gnome MacLike', message], check=False)
 
 
 if __name__ == '__main__':
     try:
         sys.exit(main())
     except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
-        print(f'Ubuntu Command: {exc}', file=sys.stderr)
+        print(f'Gnome MacLike: {exc}', file=sys.stderr)
         if '--notify' in sys.argv:
             notify(str(exc))
         sys.exit(1)

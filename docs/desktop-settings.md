@@ -111,13 +111,18 @@ nautilus --quit
 Reapplying desktop settings installs the customization again. No folders or
 folder contents are deleted when applying or removing it.
 
-## Optional Ubuntu Command trial
+## Optional Gnome MacLike dashboard
 
-The [Ubuntu Command tool](../os/ubuntu/command/README.md) uses a pinned Xremap binary
-for manually started macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland.
+The [Gnome MacLike dashboard](../os/ubuntu/command/README.md), previously Ubuntu
+Command, provides optional keyboard layers, a local wallpaper gallery, a bottom
+panel preset, and restore/uninstall controls. It uses a pinned Xremap binary for
+manually started macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland.
 It runs quietly in transient background services and is not part of the default
 bootstrap. It changes no packages, persistent services, device permissions, or
 group memberships. Starting/stopping an active session requires administrator
 authorization; the emergency stop chord does not. Its README
-lists the exact user files and extension settings it owns, the uninstall command,
-and the current shortcut limitations.
+lists the exact user files and extension settings it owns, the appearance recovery
+journal, and the current shortcut limitations. Open `os/ubuntu/command/gui.py`
+with Python for first installation; the application launcher opens the GUI after
+that. Keyboard changes take effect only when applied, and appearance controls
+save original values before modifying the allowlisted settings.

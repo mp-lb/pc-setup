@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
 
 
@@ -84,7 +85,7 @@ class Runtime:
             raise RuntimeError('Start from your active Wayland login session.')
         return f'session-{session}.scope'
 
-    def engine_command(self, apple, scope):
+    def engine_command(self, apple, scope, generated=False):
         # systemd-run quotes ExecStart arguments. Property values have a separate syntax.
         def bind(path):
             return '"' + str(path).replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%') + '"'
@@ -103,19 +104,28 @@ class Runtime:
             '--setenv=XREMAP_SOCKET=/run/user/{uid}/ubuntu-command/desktop.sock', '--setenv=RUST_LOG=error',
             str(self.app / 'xremap'), '--desktop=socket', '--no-window-logging', '--allow-launch=true',
             '--watch=device', '--output-device-name=Ubuntu Command (Xremap)',
-            str(self.app / 'config.json'), str(self.app / ('apple.json' if apple else 'pc.json')),
-        ]
+        ] + ([str(self.directory / 'active.json')] if generated else [
+            str(self.app / 'config.json'), str(self.app / ('apple.json' if apple else 'pc.json'))])
 
-    def start(self, apple=False):
+    def start(self, apple=False, preferences=None):
         self.ensure_absent()
         current = self.context()
         if current['locked']:
             raise RuntimeError('Unlock the desktop before starting.')
         scope = self.session_scope()
-        engine = self.engine_command(apple, scope)
+        engine = self.engine_command(apple, scope, generated=preferences is not None)
         # Validate with the actual upstream parser, without touching any input devices.
-        run([str(self.app / 'xremap'), '--validate-config',
-             str(self.app / 'config.json'), str(self.app / ('apple.json' if apple else 'pc.json'))])
+        compiled = None
+        if preferences is not None:
+            from profiles import compile_profile
+            compiled = json.dumps(compile_profile(self.app, preferences), indent=2)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json') as validation:
+                validation.write(compiled)
+                validation.flush()
+                run([str(self.app / 'xremap'), '--validate-config', validation.name])
+        else:
+            run([str(self.app / 'xremap'), '--validate-config',
+                 str(self.app / 'config.json'), str(self.app / ('apple.json' if apple else 'pc.json'))])
         run(['/usr/bin/systemd-run', '--user', '--quiet', '--collect', '--service-type=exec',
              '--expand-environment=no', '--unit=' + self.bridge_unit, '--description=' + self.description,
              '--property=PartOf=graphical-session.target', '--property=RuntimeDirectory=ubuntu-command',
@@ -130,6 +140,11 @@ class Runtime:
                 time.sleep(0.1)
             else:
                 raise RuntimeError('Desktop bridge did not start.')
+            if compiled is not None:
+                with (self.directory / 'active.json').open('x') as stream:
+                    stream.write(compiled)
+                with (self.directory / 'preferences.json').open('x') as stream:
+                    json.dump(preferences, stream)
             subprocess.run(engine, check=True)
             time.sleep(0.4)
             if self.state().get('ActiveState') != 'active':
