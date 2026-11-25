@@ -38,15 +38,19 @@ certification. Updating Xremap requires an intentional version/checksum update.
 
 PC keyboards: left Alt becomes Command, left Super becomes Option/Alt. Apple
 keyboards with `--apple`: existing left Command and Option positions are retained.
-AltGr and right Super are unchanged. Physical right Control sends left Control
-so it remains separate from the right-Control signal reserved for Command.
+AltGr and right Super are unchanged. Both physical Control keys send Super in
+ordinary applications, and Control in recognized standalone terminals. This
+removes duplicate Control shortcuts in ordinary apps. Command uses a separate
+Control signal so terminal interrupts and Command shortcuts remain distinct.
 
 - Command behaves as Control by default, including Command-click, copy/paste,
   select all, undo, find, save, new tabs, and app-specific Control shortcuts.
 - Command+Tab / Shift+Command+Tab: native GNOME application switching. Keep
   Command held and tap Tab to cycle; release Command to select.
 - Command+C/V: Ctrl+Shift+C/V in recognized standalone terminals.
-- Physical Control+C remains Control+C, including terminal interrupt.
+- Physical Control+C interrupts processes in recognized terminals. Outside
+  terminals, physical Control is Super: Control+A/T are no longer app shortcuts.
+  This does not reproduce macOS Control-based text editing.
 - Command+W / Shift+Command+W: the application's Control+W / Control+Shift+W;
   recognized terminals use Ctrl+Shift+W / Ctrl+Shift+Q.
 - Command+T/N: Ctrl+Shift+T/N in recognized terminals.
@@ -61,13 +65,18 @@ The JSON files use upstream Xremap's press/release actions and modes. Pressing
 Command holds a real Control modifier, so mouse clicks need no interception and
 ordinary shortcuts need no individual entries. While Command is held, terminal
 exceptions add Shift. Command+Tab releases that Control and holds Super for the
-native switcher until Command is released. Physical Control remains independent.
+native switcher until Command is released. Physical Control remains independent;
+its terminal/ordinary-app mapping is selected when the key is pressed. Xremap
+retains that choice through key release, even if focus changes.
 The lock shortcut calls GNOME's `org.gnome.ScreenSaver.Lock` D-Bus method through
 the user bridge. Minimize temporarily releases Command's Control signal and
 emits GNOME's Super+H binding. No GNOME keybindings are changed.
 
 Embedded terminals inside editors/browsers follow their host application's
-Control shortcuts; they are not detected separately. Some terminals use different
+mapping; they are not detected separately. Physical Control will be Super there,
+so use the Command key for the terminal's underlying Control shortcuts. This is
+a deliberate limit: we maintain one standalone-terminal rule, not per-app or
+per-widget exceptions. Some terminals use different
 bindings and some apps do not support GNOME's quit request. Repeated quit requests
 within one second are collapsed to avoid quitting successive apps during ordinary
 key repeat; unusually slow repeat settings still need care. Non-US layouts,
@@ -76,7 +85,8 @@ Xremap watches for newly connected keyboards. Grabbing input can affect touchpad
 "disable while typing"; no libinput workaround is installed.
 
 If GNOME context disappears or the desktop locks, terminal and quit exceptions
-are disabled. The base Command-to-Control mapping remains until Xremap stops.
+are disabled, and physical Control falls back to Control. The base
+Command-to-Control mapping remains until Xremap stops.
 Consequently Command+C can interrupt a terminal if its context is unavailable.
 
 ### Try a changed configuration or roll back

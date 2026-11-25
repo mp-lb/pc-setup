@@ -1,4 +1,35 @@
 {
+  "modmap": [
+    {
+      "name": "Physical Control stays Control in standalone terminals",
+      "application": {
+        "only": [
+          "/(?i)^(gnome-terminal-server|org\\.gnome\\.Terminal|kgx|org\\.gnome\\.Console|ptyxis|org\\.gnome\\.Ptyxis|alacritty|kitty|org\\.wezfurlong\\.wezterm|konsole|xterm)$/"
+        ]
+      },
+      "remap": {
+        "Ctrl_L": "Ctrl_L",
+        "Ctrl_R": "Ctrl_L"
+      }
+    },
+    {
+      "name": "Physical Control becomes Super in other applications",
+      "application": {
+        "only": "/.+/"
+      },
+      "remap": {
+        "Ctrl_L": "Super_R",
+        "Ctrl_R": "Super_R"
+      }
+    },
+    {
+      "name": "Preserve physical Control when desktop context is unavailable",
+      "remap": {
+        "Ctrl_L": "Ctrl_L",
+        "Ctrl_R": "Ctrl_L"
+      }
+    }
+  ],
   "keymap": [
     {
       "name": "Emergency stop with Command held",
@@ -9,6 +40,9 @@
       "remap": {
         "Ctrl-Esc": {
           "action": "exit"
+        },
+        "Super_R-Esc": {
+          "action": "exit"
         }
       }
     },
@@ -16,6 +50,9 @@
       "name": "Emergency stop with Option held",
       "remap": {
         "Ctrl-Alt_L-Esc": {
+          "action": "exit"
+        },
+        "Super_R-Alt_L-Esc": {
           "action": "exit"
         }
       }
@@ -26,6 +63,11 @@
       "exact_match": true,
       "remap": {
         "Ctrl-q": {
+          "launch": [
+            "ubuntu-command-lock"
+          ]
+        },
+        "Super_R-q": {
           "launch": [
             "ubuntu-command-lock"
           ]

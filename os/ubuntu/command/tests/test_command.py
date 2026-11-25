@@ -389,7 +389,7 @@ class XremapTests(unittest.TestCase):
             self.assertIn({'release': 'Ctrl_R'}, command['release'])
             self.assertIn({'release': 'Super_L'}, command['release'])
             self.assertIn({'set_mode': 'default'}, command['release'])
-            self.assertEqual(remap['Ctrl_R'], 'Ctrl_L')
+            self.assertNotIn('Ctrl_R', remap)
             self.assertNotIn('Ctrl_L', remap)
             self.assertNotIn('Alt_R', remap)
         # App switching must hold Super across repeated Tabs, not emit a tap
@@ -398,6 +398,28 @@ class XremapTests(unittest.TestCase):
         actions = switcher['remap']['Tab']
         self.assertLess(actions.index({'release': 'Ctrl_R'}), actions.index({'press': 'Super_L'}))
         self.assertNotIn({'release': 'Super_L'}, actions)
+
+    def test_physical_control_has_one_terminal_exception_and_safe_context_fallback(self):
+        import re
+        config = json.loads((SOURCE/'config.json').read_text())
+        terminals, apps, fallback = config['modmap']
+        terminal_shortcuts = next(k for k in config['keymap'] if k['name'].startswith('Terminal'))
+        self.assertEqual(terminals['application'], terminal_shortcuts['application'])
+        pattern = terminals['application']['only'][0][1:-1]
+        for app in ('ptyxis', 'org.gnome.Terminal', 'kitty', 'Alacritty'):
+            self.assertIsNotNone(re.fullmatch(pattern, app))
+        for app in ('chromium', 'firefox', 'code', ''):
+            self.assertIsNone(re.fullmatch(pattern, app))
+        self.assertEqual(apps['application'], {'only': '/.+/'})
+        self.assertNotIn('application', fallback)
+        for key in ('Ctrl_L', 'Ctrl_R'):
+            self.assertEqual(terminals['remap'][key], 'Ctrl_L')
+            self.assertEqual(apps['remap'][key], 'Super_R')
+            self.assertEqual(fallback['remap'][key], 'Ctrl_L')
+        # Physical emergency-stop chords must survive both modifier meanings.
+        stop = config['keymap'][0]['remap']
+        self.assertEqual(stop['Ctrl-Esc'], {'action': 'exit'})
+        self.assertEqual(stop['Super_R-Esc'], {'action': 'exit'})
 
     def test_lock_chord_is_distinct_from_quit(self):
         keymaps = json.loads((SOURCE/'config.json').read_text())['keymap']
@@ -408,6 +430,7 @@ class XremapTests(unittest.TestCase):
         self.assertNotIn('application', lock)  # Also works with no focused window.
         self.assertLess(keymaps.index(lock), keymaps.index(quit_app))
         self.assertEqual(lock['remap']['Ctrl-q'], {'launch': ['ubuntu-command-lock']})
+        self.assertEqual(lock['remap']['Super_R-q'], {'launch': ['ubuntu-command-lock']})
         self.assertEqual(quit_app['remap']['q'], {'launch': ['ubuntu-command-quit']})
 
     def test_bridge_never_executes_arbitrary_launches_and_hides_locked_context(self):
