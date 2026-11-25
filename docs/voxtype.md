@@ -55,6 +55,10 @@ newlines, leaving auto-submit off. `VOXTYPE_MODEL` can select another supported
 Parakeet GGUF and `VOXTYPE_SHORTCUT` can change the GNOME accelerator. This is an
 explicit setup utility, never part of bootstrap.
 
+GNOME does not implement the Layer Shell protocol used by the waveform OSD.
+The utility disables that overlay and enables recording start/stop desktop
+notifications instead.
+
 This setup does not require the `input` group. If that group was added solely
 for a previous built-in hotkey setup, remove it with
 `sudo gpasswd -d "$USER" input`. Log out and back in if the current session had

@@ -27,6 +27,10 @@ voxtype --config "$config" config set parakeet.threads "$(lscpu -p=CORE,SOCKET |
 voxtype --config "$config" config set text.language en
 voxtype --config "$config" config set hotkey.enabled false
 voxtype --config "$config" config set output.shift_enter_newlines true
+# GNOME does not implement the Layer Shell protocol used by the waveform OSD.
+voxtype --config "$config" config set osd.enabled false
+voxtype --config "$config" config set output.notification.on_recording_start true
+voxtype --config "$config" config set output.notification.on_recording_stop true
 voxtype --config "$config" config validate-selection
 
 # Preserve unrelated custom shortcuts. GNOME treats both Super keys alike.
