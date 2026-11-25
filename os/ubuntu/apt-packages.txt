@@ -9,4 +9,5 @@ python3-nautilus
 shellcheck
 tmux
 tree
+vim
 zsh

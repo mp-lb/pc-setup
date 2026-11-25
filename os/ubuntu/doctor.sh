@@ -1,3 +1,4 @@
+check_command "Vim" vim --version
 check_command "Docker CLI" docker --version
 check_command "Docker daemon (local socket access)" docker --host unix:///var/run/docker.sock info
 check_command "Docker Compose" docker compose version

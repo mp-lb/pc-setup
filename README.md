@@ -6,6 +6,9 @@ Zapper CLIs, and global instructions and skills for Codex and Claude Code. It al
 a shell profile bridge and MAP Lab AWS SSO profiles. On Ubuntu GNOME it also
 applies portable desktop appearance preferences and the bundled wallpaper.
 
+Ubuntu setup includes Vim for terminal editing. Doctor checks that it is available,
+and inventory reports its installed package version.
+
 ## Install
 
 From an existing checkout, run:
