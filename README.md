@@ -162,9 +162,6 @@ instructions linked above before rerunning it. Doctor requires the local daemon,
 Compose and Buildx, and checks that Docker and containerd are running and enabled
 at boot. Ubuntu desktop apps remain outside the base install.
 
-To install an already downloaded T3 Code AppImage with a desktop launcher, see
-[T3 Code on Ubuntu](docs/t3-code.md).
-
 ## Google Cloud CLI and Overmind
 
 Setup installs the [Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk)
