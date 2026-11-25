@@ -19,3 +19,10 @@ alias yolo="claude --dangerously-skip-permissions"
 if [[ -f "$PC_SETUP_REPO_PATH/zshrc-user.sh" ]]; then
   source "$PC_SETUP_REPO_PATH/zshrc-user.sh"
 fi
+
+# Ubuntu terminal windows and tabs start in Work, even with an inherited cwd.
+# Keep commands, scripts, and macOS in the directory their caller selected.
+if [[ "$OSTYPE" == linux* && -o interactive && -z "${ZSH_EXECUTION_STRING+x}" && -t 0 &&
+      -d "${PC_SETUP_WORKSPACE:-$HOME/Work}" ]]; then
+  builtin cd -- "${PC_SETUP_WORKSPACE:-$HOME/Work}"
+fi

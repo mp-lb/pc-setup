@@ -78,6 +78,12 @@ zsh as your login shell. With `ZDOTDIR` set, the bridges go there instead.
 Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
 copy the MAP Lab profiles you need from `env/aws-config` into it.
 
+On Ubuntu, new interactive zsh terminals start in `PC_SETUP_WORKSPACE` (default
+`~/Work`), including windows and tabs that inherit another directory. The
+directory must already exist. Command invocations (`zsh -c`, including `-ic`),
+non-terminal sessions, and macOS keep their starting directory. The existing
+shell bridge applies this preference to new terminals immediately.
+
 ### Non-interactive shells
 
 Zsh reads `.zshenv` for ordinary interactive and non-interactive invocations

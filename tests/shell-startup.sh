@@ -58,4 +58,48 @@ for dotdir in "$test_home" "$test_home/custom zsh"; do
     [[ "$TEST_EXISTING_ENV" == preserved && "$TEST_INTERACTIVE_RC" == 1 && "$TEST_INTERACTIVE_MISE" == 1 ]]
   '
 done
+
+# Use a real terminal to verify startup cwd without redirecting command jobs.
+python3 - "$test_home" "$test_root" "$REPO" <<'PYTHON'
+import errno
+import os
+import pty
+import sys
+
+home, start_dir, repo = sys.argv[1:]
+workspace = os.path.join(start_dir, 'work space')
+dotdir = os.path.join(start_dir, 'terminal-zsh')
+os.mkdir(dotdir)
+with open(os.path.join(dotdir, '.zshrc'), 'w') as rc:
+    rc.write('source "$PC_SETUP_REPO_PATH/env/zshrc"\n')
+for args, target in [([], workspace), (['-l'], workspace),
+                     (['-c', 'print -r -- "START_DIR=$PWD"'], workspace),
+                     ([], os.path.join(start_dir, 'missing'))]:
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.chdir(start_dir)
+        os.execve('/bin/zsh', ['zsh', '-i', *args], {
+            'HOME': home, 'PATH': '/usr/bin:/bin', 'TERM': 'dumb',
+            'PC_SETUP_WORKSPACE': target, 'PC_SETUP_REPO_PATH': repo,
+            'ZDOTDIR': dotdir,
+        })
+    if '-c' not in args:
+        os.write(fd, b'print -r -- "START_DIR=$PWD"\nexit\n')
+    output = b''
+    while True:
+        try:
+            chunk = os.read(fd, 4096)
+        except OSError as error:
+            if error.errno != errno.EIO:
+                raise
+            break
+        if not chunk:
+            break
+        output += chunk
+    os.close(fd)
+    _, status = os.waitpid(pid, 0)
+    expected = (target if sys.platform.startswith('linux') and '-c' not in args
+                and os.path.isdir(target) else start_dir)
+    assert status == 0 and f'START_DIR={expected}\r\n'.encode() in output, output
+PYTHON
 printf 'Shell startup tests passed.\n'
