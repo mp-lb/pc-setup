@@ -22,6 +22,13 @@ new binary before removing the old installation, then restore old managed
 settings and install inactive; saved layer choices reset. No terminal is needed
 after installation: open **Gnome MacLike** from the applications menu.
 
+For an existing Ubuntu Command trial, `python3 -B control.py refresh-launcher`
+renames the owned launcher and opens this source checkout's GUI for upgrading.
+It does not stop the current remapper or need administrator access. It updates
+the launcher's recorded checksum with a retryable staging journal; run the same
+command again if interrupted. The normal GUI installation then points the
+launcher at the installed GUI, independent of the source checkout.
+
 The host must already provide Python GObject, GTK 4 and libadwaita 1.5+. No packages
 are installed. Keyboard remapping runs independently of the window: closing the
 dashboard does not stop it. **Stop** restores the original keyboard behavior.

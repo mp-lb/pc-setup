@@ -125,10 +125,14 @@ class Install:
             payload['app/' + name] = (self.engine if self.engine is not None else engine_payload()) if name == 'xremap' else (self.source / name).read_bytes()
         for name in ('metadata.json', 'extension.js'):
             payload['extension/' + name] = (self.source / 'extension' / name).read_bytes()
-        executable = str(self.app / 'control.py').replace('\\', '\\\\').replace('"', '\\"')
-        gui = str(self.app / 'gui.py').replace('\\', '\\\\').replace('"', '\\"')
         payload['app/run.lock'] = b''
-        payload['launcher'] = ('[Desktop Entry]\nType=Application\nName=Gnome MacLike\n'
+        payload['launcher'] = self.launcher_payload()
+        return payload
+
+    def launcher_payload(self, gui_path=None):
+        executable = str(self.app / 'control.py').replace('\\', '\\\\').replace('"', '\\"')
+        gui = str(gui_path or self.app / 'gui.py').replace('\\', '\\\\').replace('"', '\\"')
+        return ('[Desktop Entry]\nType=Application\nName=Gnome MacLike\n'
                               'Comment=Familiar shortcuts, wallpapers and dock, with restore controls\n'
                               f'Exec=/usr/bin/python3 -B "{gui}"\n'
                               'Icon=preferences-desktop-keyboard-shortcuts\nStartupWMClass=dev.mplb.GnomeMacLike\n'
@@ -137,7 +141,62 @@ class Install:
                               f'Exec=/usr/bin/python3 -B "{executable}" stop --notify\n\n'
                               '[Desktop Action Uninstall]\nName=Uninstall Gnome MacLike\n'
                               f'Exec=/usr/bin/python3 -B "{executable}" uninstall --notify\n').encode()
-        return payload
+
+    def refresh_launcher(self):
+        """Expose the GUI without restarting the remapper or losing file ownership."""
+        from preferences import write_json
+        with self.operation():
+            info = self.load()
+            for root in (self.app, self.record_dir, self.launcher):
+                if root.is_symlink():
+                    raise RuntimeError(f'Replaced installation path: {root}')
+            stage = self.record_dir / 'staging'
+            pending = stage / 'launcher-update.json'
+            current = hashlib.sha256(self.launcher.read_bytes()).hexdigest()
+            if os.path.lexists(stage):
+                if stage.is_symlink() or not pending.is_file() or pending.is_symlink():
+                    raise RuntimeError('An unfinished installation exists; use its uninstall recovery first.')
+                if {p.name for p in stage.iterdir()} - {'launcher-update.json', 'launcher'}:
+                    raise RuntimeError('Unexpected staging files preserved.')
+                plan = json.loads(pending.read_text())
+                if set(plan) != {'before', 'after', 'content'} or not isinstance(plan['content'], str):
+                    raise ValueError('Invalid launcher recovery record.')
+                if hashlib.sha256(plan['content'].encode()).hexdigest() != plan['after']:
+                    raise ValueError('Launcher recovery checksum mismatch.')
+                if current not in (plan['before'], plan['after']) or info['files']['launcher'] not in (plan['before'], plan['after']):
+                    raise RuntimeError('Launcher changed outside this update; preserved for review.')
+            else:
+                if current != info['files']['launcher']:
+                    raise RuntimeError('Modified launcher preserved; refusing to overwrite it.')
+                gui = self.app / 'gui.py'
+                if not gui.is_file():
+                    gui = self.source / 'gui.py'  # Legacy installation: open the upgrade dashboard.
+                if not gui.is_file():
+                    raise RuntimeError('GUI source is missing; nothing changed.')
+                content = self.launcher_payload(gui)
+                if hashlib.sha256(content).hexdigest() == current:
+                    print('Launcher is already current.')
+                    return
+                plan = {'before': current, 'after': hashlib.sha256(content).hexdigest(), 'content': content.decode()}
+                stage.mkdir(mode=0o700)
+                write_json(pending, plan)
+            if current != plan['after']:
+                staged = stage / 'launcher'
+                if staged.is_symlink():
+                    raise RuntimeError('Replaced staged launcher; preserved for review.')
+                with staged.open('wb') as stream:
+                    stream.write(plan['content'].encode())
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                info['files']['launcher'] = plan['after']
+                self.save(info)
+                os.replace(staged, self.launcher)
+            elif info['files']['launcher'] != plan['after']:
+                info['files']['launcher'] = plan['after']
+                self.save(info)
+            pending.unlink()
+            stage.rmdir()
+        print('Gnome MacLike launcher updated. The keyboard session was not changed.')
 
     def path_for(self, label):
         # Never use arbitrary paths from a writable manifest for cleanup.
@@ -410,7 +469,7 @@ def preflight():
 
 def main():
     parser = argparse.ArgumentParser(description='Optional, session-only Mac-style keyboard shortcuts on Ubuntu.')
-    parser.add_argument('action', choices=('install', 'start', 'stop', 'uninstall', 'status'))
+    parser.add_argument('action', choices=('install', 'start', 'stop', 'uninstall', 'status', 'refresh-launcher'))
     parser.add_argument('--notify', action='store_true', help='Show desktop feedback when launched without a terminal.')
     parser.add_argument('--archive', type=Path, help='Use a locally downloaded, checksum-verified Xremap release zip.')
     parser.add_argument('--apple', action='store_true', help='Use the physical Command key on an Apple keyboard.')
@@ -430,6 +489,8 @@ def main():
         print('Session stopped.')
     elif args.action == 'uninstall':
         install.uninstall()
+    elif args.action == 'refresh-launcher':
+        install.refresh_launcher()
     else:
         print('Installed' if install.record.exists() else 'Not installed')
         print('Session running' if install.runtime.running() or list(install.sessions()) else 'No running session')

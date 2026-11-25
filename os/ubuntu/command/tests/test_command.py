@@ -235,6 +235,54 @@ class InstallTests(unittest.TestCase):
         self.install.uninstall()
         self.assertEqual(snapshot(self.root), {})
 
+    def legacy_launcher(self):
+        self.install.install()
+        content = b'[Desktop Entry]\nType=Application\nName=Ubuntu Command\nExec=true\n'
+        self.install.launcher.write_bytes(content)
+        info = self.install.load()
+        info['files']['launcher'] = hashlib.sha256(content).hexdigest()
+        # Model the old installation, which did not include a GUI.
+        del info['files']['app/gui.py']
+        (self.install.app/'gui.py').unlink()
+        self.install.save(info)
+
+    def test_launcher_refresh_opens_source_gui_and_preserves_uninstall(self):
+        self.legacy_launcher()
+        with patch.object(self.install.runtime, 'stop') as stop:
+            self.install.refresh_launcher()
+            stop.assert_not_called()
+        launcher = self.install.launcher.read_text()
+        self.assertIn('Name=Gnome MacLike\n', launcher)
+        self.assertIn(str(SOURCE/'gui.py'), launcher)
+        self.assertEqual(hashlib.sha256(self.install.launcher.read_bytes()).hexdigest(), self.install.load()['files']['launcher'])
+        self.assertFalse((self.install.record_dir/'staging').exists())
+        self.install.uninstall()
+        self.assertEqual(snapshot(self.root), {})
+
+    def test_interrupted_launcher_publication_can_resume(self):
+        self.legacy_launcher()
+        replace = os.replace
+        def fail_launcher(source, target):
+            if Path(target) == self.install.launcher:
+                raise OSError('publication failed')
+            return replace(source, target)
+        with patch('control.os.replace', side_effect=fail_launcher):
+            with self.assertRaisesRegex(OSError, 'publication failed'):
+                self.install.refresh_launcher()
+        self.assertTrue((self.install.record_dir/'staging/launcher-update.json').exists())
+        with self.assertRaisesRegex(RuntimeError, 'Modified file preserved'):
+            self.install.uninstall()
+        self.install.refresh_launcher()
+        self.install.uninstall()
+        self.assertEqual(snapshot(self.root), {})
+
+    def test_launcher_refresh_preserves_external_edits(self):
+        self.legacy_launcher()
+        self.install.launcher.write_text('user changed this')
+        with self.assertRaisesRegex(RuntimeError, 'Modified launcher preserved'):
+            self.install.refresh_launcher()
+        self.assertEqual(self.install.launcher.read_text(), 'user changed this')
+
     def test_failed_initial_manifest_write_leaves_nothing(self):
         with patch.object(self.install, 'save', side_effect=OSError('disk full')):
             with self.assertRaises(OSError):
