@@ -47,22 +47,23 @@ bash os/ubuntu/configure-voxtype.sh
 
 This downloads and selects Parakeet Ultra Q8, selects the packaged Vulkan worker
 through the wrapper's `VOXTYPE_GPU=1` environment setting, adds a user service
-drop-in, and enables the service. Right Ctrl toggles recording through Voxtype's
-built-in hotkey listener. Existing Voxtype configuration is backed up before
+drop-in, and enables the service. Super+/ toggles recording through GNOME,
+with Voxtype's built-in keyboard listener disabled. Both left and right Super
+work because GNOME does not distinguish modifier sides. Existing config is backed up before
 changing the managed settings. It sets English cleanup and Shift+Enter for
 newlines, leaving auto-submit off. `VOXTYPE_MODEL` can select another supported
-Parakeet GGUF and `VOXTYPE_HOTKEY` can change the evdev key name. This is an
+Parakeet GGUF and `VOXTYPE_SHORTCUT` can change the GNOME accelerator. This is an
 explicit setup utility, never part of bootstrap.
 
-A standalone Right Ctrl key requires evdev access. If the user is not in the
-`input` group, run `sudo usermod -aG input "$USER"` in a normal terminal, then
-log out and back in. This group lets programs running as the user read keyboard
-input. A GNOME compositor shortcut remains an alternative for key combinations.
-The utility reports missing membership without making privileged changes.
+This setup does not require the `input` group. If that group was added solely
+for a previous built-in hotkey setup, remove it with
+`sudo gpasswd -d "$USER" input`. Log out and back in if the current session had
+already acquired that membership.
 
 To undo automatic startup, run `systemctl --user disable --now voxtype`. Remove
 `~/.config/systemd/user/voxtype.service.d/pc-setup-gpu.conf`, then restore the
-saved config if one existed. Model files remain available for reuse.
+saved config if one existed. Remove the Voxtype shortcut in GNOME Settings.
+Model files remain available for reuse.
 
 References: [release](https://github.com/peteonrails/voxtype/releases/tag/v1.3.1),
 [installation](https://github.com/peteonrails/voxtype/blob/v1.3.1/docs/INSTALL.md),
