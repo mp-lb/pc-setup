@@ -1,7 +1,0 @@
-{
-  "uuid": "ubuntu-command@mp-lb.dev",
-  "name": "Ubuntu Command",
-  "description": "Focused application information for the optional Ubuntu Command keyboard session.",
-  "shell-version": ["50"],
-  "version": 1
-}
