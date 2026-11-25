@@ -116,11 +116,16 @@ folder contents are deleted when applying or removing it.
 The [GNOME MacLike dashboard](https://github.com/mp-lb/gnome-maclike) is maintained
 in its own repository at `~/Work/gnome-maclike`. It provides optional keyboard layers, a local wallpaper gallery, a bottom
 panel preset, and restore/uninstall controls. It uses a pinned Xremap binary for
-manually started macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland.
-It runs quietly in transient background services and is not part of the default
-bootstrap. It changes no packages, persistent services, device permissions, or
-group memberships. Starting/stopping an active session requires administrator
-authorization; the emergency stop chord does not. Its README
+macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland. Its lifecycle is
+Enable, Disable, Doctor and Uninstall: enabling remembers the choice across
+graphical logins; closing the dashboard does not disable it. This optional app
+is not part of the default bootstrap. The app's own installer owns and audits
+its per-user login integration and narrowly scoped system keyboard service.
+Provisioning/removing that integration requires administrator authorization;
+ordinary enable/disable must not prompt on each login. No input-group membership,
+broad device permission changes or blanket administrator authorization belong
+in PC setup. Installation, rollback and removal are implemented and tested in
+the GNOME MacLike repository, rather than duplicated here. Its README
 lists the exact user files and extension settings it owns, the appearance recovery
 journal, timestamped audit history, and the current shortcut limitations. Open
 `~/Work/gnome-maclike/gui.py` with Python for first installation; the application launcher opens the GUI after
