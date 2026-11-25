@@ -18,7 +18,16 @@ class Preview(Application):
     def do_activate(self):
         Gtk.Settings.get_default().set_property('gtk-enable-animations', False)
         super().do_activate()
-        GLib.timeout_add(1500, self.capture, self.get_active_window(), 0)
+        window = self.get_active_window()
+        assert not window.loaded and not window.refreshing
+        assert not window.apply_button.get_sensitive()
+        window.check_button.emit('clicked')
+        def ready():
+            if window.refreshing or window.gallery_loading:
+                return True
+            self.capture(window, 0)
+            return False
+        GLib.timeout_add(100, ready)
 
     def capture(self, window, index):
         """Render actual GTK pages for local visual checks; no desktop screenshots."""

@@ -15,7 +15,7 @@ Open the GUI as your normal user from this directory:
 python3 -B gui.py
 ```
 
-Choose **Install** (or **Update installation** for the previous trial), then
+Choose **Check setup**, then **Install** (or **Update installation** for the previous trial), then
 **Apply and start** on the Keyboard page. Ubuntu's normal authentication dialog
 handles starting/stopping the privileged remapper. Updates fetch and verify the
 new binary before removing the old installation, then restore old managed
@@ -28,6 +28,12 @@ It does not stop the current remapper or need administrator access. It updates
 the launcher's recorded checksum with a retryable staging journal; run the same
 command again if interrupted. The normal GUI installation then points the
 launcher at the installed GUI, independent of the source checkout.
+
+For GUI-only development changes, run `python3 -B refresh_gui.py` from the source
+checkout, then close and reopen the window. This preserves the running keyboard
+session, saved choices and restoration records. It refuses changes to other app
+modules and records the new GUI checksum for uninstall. Retry the same command
+if interrupted. The GUI does not hot-reload; restarting it does not reset settings.
 
 The host must already provide Python GObject, GTK 4 and libadwaita 1.5+. No packages
 are installed. Keyboard remapping runs independently of the window: closing the
@@ -78,12 +84,15 @@ replace normal Linux browser back/forward navigation. Specialized editors and
 terminal programs can interpret these keys differently. Turn the layer off or
 exclude an app rather than adding an open-ended collection of exceptions.
 
-The gallery reads local JPEG/PNG/WebP images, shows resolution, filters for at
-least 5120×2880 landscape images, and previews before applying. A folder can show
+Setup is checked only on request or after an explicit operation, never on startup
+or a polling timer. File reads and image decoding run off the GTK event loop.
+The image-only gallery reads local JPEG/PNG/WebP images, filters for at least
+5120×2880 landscape images, and shows names and resolution in the preview. A folder can show
 up to 200 candidate files. Images stay at their original paths: do not move or
 delete an active wallpaper. Choosing a folder alone never changes the wallpaper.
 Images are not copied, uploaded, bundled, or assigned new licenses. Filenames
-are display labels, not independently verified author credits.
+are display labels, not independently verified author credits. Scaled previews
+are cached only in memory; there is no thumbnail cache to remove at uninstall.
 
 The dock preset changes only position, full-width layout, centered icons and
 fixed visibility in the existing Ubuntu Dock / Dash to Dock extension. Plain

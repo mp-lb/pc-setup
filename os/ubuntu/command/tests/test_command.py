@@ -283,6 +283,55 @@ class InstallTests(unittest.TestCase):
             self.install.refresh_launcher()
         self.assertEqual(self.install.launcher.read_text(), 'user changed this')
 
+    def old_gui(self):
+        self.install.install()
+        target = self.install.app / 'gui.py'
+        target.write_text('# previous GUI\n')
+        info = self.install.load()
+        info['files']['app/gui.py'] = hashlib.sha256(target.read_bytes()).hexdigest()
+        self.install.save(info)
+
+    def test_gui_refresh_preserves_choices_and_complete_uninstall(self):
+        from refresh_gui import refresh
+        from preferences import save_preferences
+        from profiles import DEFAULTS
+        self.old_gui()
+        save_preferences(self.install.record_dir, DEFAULTS)
+        before = (self.install.record_dir / 'preferences.json').read_bytes()
+        with patch.object(self.install.runtime, 'stop') as stop:
+            refresh(self.install)
+            stop.assert_not_called()
+        self.assertEqual((self.install.app / 'gui.py').read_bytes(), (SOURCE / 'gui.py').read_bytes())
+        self.assertEqual((self.install.record_dir / 'preferences.json').read_bytes(), before)
+        self.install.uninstall()
+        self.assertEqual(snapshot(self.root), {})
+
+    def test_gui_refresh_recovers_interrupted_publication(self):
+        from refresh_gui import refresh
+        self.old_gui()
+        replace = os.replace
+        def fail_gui(source, target):
+            if Path(target) == self.install.app / 'gui.py':
+                raise OSError('publication failed')
+            return replace(source, target)
+        with patch('refresh_gui.os.replace', side_effect=fail_gui):
+            with self.assertRaisesRegex(OSError, 'publication failed'):
+                refresh(self.install)
+        with self.assertRaisesRegex(RuntimeError, 'Modified file preserved'):
+            self.install.uninstall()
+        refresh(self.install)
+        self.install.uninstall()
+        self.assertEqual(snapshot(self.root), {})
+
+    def test_gui_refresh_preserves_modified_files(self):
+        from refresh_gui import refresh
+        self.old_gui()
+        target = self.install.app / 'gui.py'
+        target.write_text('user edit')
+        with self.assertRaisesRegex(RuntimeError, 'Modified GUI preserved'):
+            refresh(self.install)
+        self.assertEqual(target.read_text(), 'user edit')
+
     def test_failed_initial_manifest_write_leaves_nothing(self):
         with patch.object(self.install, 'save', side_effect=OSError('disk full')):
             with self.assertRaises(OSError):

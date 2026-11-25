@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 """A native, optional dashboard. The window does not handle keyboard events."""
 import argparse
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 import copy
 from pathlib import Path
 import sys
@@ -11,7 +13,7 @@ sys.dont_write_bytecode = True
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Adw, Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, GdkPixbuf, Gio, GLib, Gtk
 
 from dashboard import Dashboard
 from profiles import DEFAULTS, LAYERS
@@ -45,6 +47,12 @@ class Window(Adw.ApplicationWindow):
         self.switches = {}
         self.guarded = []
         self.preview_folder = None
+        self.refreshing = False
+        self.gallery_loading = False
+        self.gallery_generation = 0
+        self.gallery_job = None
+        self.images = ThreadPoolExecutor(max_workers=1, thread_name_prefix='wallpapers')
+        self.image_cache = OrderedDict()  # Worker-only, bounded, memory-only thumbnails.
         self.connect('close-request', self.close_requested)
         self.toast = Adw.ToastOverlay()
         self.set_content(self.toast)
@@ -53,8 +61,10 @@ class Window(Adw.ApplicationWindow):
         self.toast.set_child(root)
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(title='Gnome MacLike', subtitle='Your desktop, with a familiar feel'))
+        self.check_button = button('Check setup', self.refresh)
+        header.pack_end(self.check_button)
         root.append(header)
-        self.banner = Adw.Banner(title='Checking your setup…')
+        self.banner = Adw.Banner(title='Check setup to load your saved choices and enable controls. No settings will change.')
         root.append(self.banner)
         self.banner.set_revealed(True)
         self.banner.connect('button-clicked', lambda *_: self.install_clicked())
@@ -70,13 +80,16 @@ class Window(Adw.ApplicationWindow):
         self.wallpaper_page()
         self.dock_page()
         self.restore_page()
-        self.refresh()
-        GLib.timeout_add_seconds(4, self.poll)
+        self.status_row.set_title('Keyboard status not checked')
+        self.status_row.set_subtitle('Click Check setup to read the current session and saved choices.')
+        self.sensitivity()
 
     def close_requested(self, *_):
         if self.busy:
             self.toast.add_toast(Adw.Toast(title='Wait for the current operation to finish, or cancel its authentication prompt.'))
             return True
+        self.gallery_generation += 1
+        self.images.shutdown(wait=False, cancel_futures=True)
         return False
 
     def page(self, title, icon, subtitle):
@@ -184,6 +197,9 @@ class Window(Adw.ApplicationWindow):
         page.append(self.gallery_label)
         self.gallery = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
                                    min_children_per_line=3, max_children_per_line=3, row_spacing=16, column_spacing=16)
+        css = Gtk.CssProvider()
+        css.load_from_string('.wallpaper-tile { padding: 0; border-radius: 12px; }')
+        Gtk.StyleContext.add_provider_for_display(self.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         page.append(self.gallery)
 
     def choose_folder(self):
@@ -199,54 +215,98 @@ class Window(Adw.ApplicationWindow):
         chooser.show()
 
     def load_gallery(self):
+        # Snapshot GTK state here; directory reads and image decoding never run
+        # on the GTK thread. One worker and a generation token bound rapid toggles.
+        self.gallery_generation += 1
+        generation = self.gallery_generation
+        if self.gallery_job:
+            self.gallery_job.cancel()
         child = self.gallery.get_first_child()
         while child:
             following = child.get_next_sibling()
             self.gallery.remove(child)
             child = following
-        if not self.preview_folder or not self.preview_folder.is_dir():
+        folder = self.preview_folder
+        if not folder:
+            self.gallery_loading = False
             self.gallery_label.set_text('Choose a folder to browse wallpapers. No image files are copied.')
             return
-        count = 0
-        below = 0
-        candidates = sorted(p for p in self.preview_folder.iterdir() if p.is_file() and p.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp'))[:200]
-        for path in candidates:
-            try:
-                fmt, width, height = GdkPixbuf.Pixbuf.get_file_info(str(path))
-                if not fmt or width * height > 200_000_000:
-                    continue
-                high = width >= 5120 and height >= 2880 and width >= height
-                if self.fivek.get_active() and not high:
-                    below += 1
-                    continue
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), 460, 280, True)
-            except (GLib.Error, TypeError):
-                continue
+        fivek = self.fivek.get_active()
+        self.gallery_loading = True
+        self.gallery_label.set_text(f'{folder}\nLoading images…')
+
+        def add_tile(path, width, height, pixbuf):
+            if generation != self.gallery_generation:
+                return False
             picture = Gtk.Picture.new_for_paintable(Gdk.Texture.new_for_pixbuf(pixbuf))
             picture.set_content_fit(Gtk.ContentFit.COVER)
             picture.set_can_shrink(True)
             frame = Gtk.AspectFrame(ratio=1.6, obey_child=False, child=picture)
             frame.set_size_request(210, 135)
-            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            card.append(frame)
-            title = path.stem.rsplit('-', 2)[0] if path.stem.endswith('-unsplash') else path.stem
-            name = label(title.replace('-', ' ').title())
-            name.set_ellipsize(Pango.EllipsizeMode.END)
-            name.set_lines(1)
-            name.set_max_width_chars(24)
-            card.append(name)
-            card.append(label(f'{width:,} × {height:,}' + ('  ·  5K+' if high else ''), 'dim-label'))
-            tile = Gtk.Button(child=card)
+            tile = Gtk.Button(child=frame)
             tile.add_css_class('card')
-            tile.set_tooltip_text(str(path))
-            tile.connect('clicked', lambda _, p=path: self.preview_wallpaper(p))
+            tile.add_css_class('wallpaper-tile')
+            tile.set_overflow(Gtk.Overflow.HIDDEN)
+            tile.set_tooltip_text(f'{path.name}\nClick to preview and see details')
+            tile.update_property([Gtk.AccessibleProperty.LABEL], [f'Preview {path.name}'])
+            tile.connect('clicked', lambda _: self.preview_wallpaper(path, width, height, pixbuf))
             self.gallery.append(tile)
-            count += 1
-        self.gallery_label.set_text(f'{self.preview_folder}\n{count} images shown' + (f' · {below} below the 5K landscape filter' if below else ''))
+            return False
 
-    def preview_wallpaper(self, path):
-        dialog = Adw.AlertDialog(heading='Use this wallpaper?', body=path.name)
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), 650, 400, True)
+        def done(count, below, skipped, error):
+            if generation != self.gallery_generation:
+                return False
+            self.gallery_loading = False
+            text = (f'{folder}\n{count} images shown' +
+                    (f' · {below} below the 5K landscape filter' if below else '') +
+                    (f' · {skipped} unreadable or oversized' if skipped else ''))
+            self.gallery_label.set_text(f'Could not load folder: {error}' if error else text)
+            return False
+
+        def worker():
+            count = below = skipped = 0
+            error = None
+            try:
+                candidates = sorted(p for p in folder.iterdir() if p.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp'))[:200]
+                for path in candidates:
+                    if generation != self.gallery_generation:
+                        return
+                    try:
+                        stat = path.stat()
+                        key = (str(path), stat.st_mtime_ns, stat.st_size)
+                        cached = self.image_cache.get(key)
+                        if cached:
+                            width, height, pixbuf = cached
+                            self.image_cache.move_to_end(key)
+                        else:
+                            fmt, width, height = GdkPixbuf.Pixbuf.get_file_info(str(path))
+                            if not fmt or width * height > 200_000_000:
+                                skipped += 1
+                                continue
+                        if fivek and not (width >= 5120 and height >= 2880 and width >= height):
+                            below += 1
+                            continue
+                        if not cached:
+                            # Reuse this scaled image in the preview too: never
+                            # decode a full-resolution original when opening it.
+                            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), 650, 400, True)
+                            self.image_cache[key] = (width, height, pixbuf)
+                            if len(self.image_cache) > 64:
+                                self.image_cache.popitem(last=False)
+                    except (GLib.Error, TypeError, OSError):
+                        skipped += 1
+                        continue
+                    if generation != self.gallery_generation:
+                        return
+                    GLib.idle_add(add_tile, path, width, height, pixbuf)
+                    count += 1
+            except Exception as exc:
+                error = str(exc)
+            GLib.idle_add(done, count, below, skipped, error)
+        self.gallery_job = self.images.submit(worker)
+
+    def preview_wallpaper(self, path, width, height, pixbuf):
+        dialog = Adw.AlertDialog(heading='Use this wallpaper?', body=f'{path.name}\n{width:,} × {height:,}')
         dialog.set_extra_child(Gtk.Picture.new_for_paintable(Gdk.Texture.new_for_pixbuf(pixbuf)))
         dialog.add_response('cancel', 'Cancel')
         dialog.add_response('apply', 'Set wallpaper')
@@ -299,10 +359,14 @@ class Window(Adw.ApplicationWindow):
     def show_details(self):
         dialog = Adw.AlertDialog(heading='Installation and restoration record')
         view = Gtk.TextView(editable=False, monospace=True, wrap_mode=Gtk.WrapMode.WORD_CHAR)
-        try:
-            view.get_buffer().set_text(self.backend.details())
-        except Exception as exc:
-            view.get_buffer().set_text(str(exc))
+        view.get_buffer().set_text('Reading recovery record…')
+        def worker():
+            try:
+                text = self.backend.details()
+            except Exception as exc:
+                text = str(exc)
+            GLib.idle_add(view.get_buffer().set_text, text)
+        threading.Thread(target=worker, daemon=True).start()
         scroll = Gtk.ScrolledWindow(child=view, min_content_height=320, min_content_width=560)
         dialog.set_extra_child(scroll)
         dialog.add_response('close', 'Close')
@@ -325,7 +389,7 @@ class Window(Adw.ApplicationWindow):
             self.work(self.backend.install_current)
 
     def work(self, action, quiet=False):
-        if self.busy:
+        if self.busy or self.refreshing:
             return
         self.busy = True
         self.sensitivity()
@@ -356,22 +420,23 @@ class Window(Adw.ApplicationWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def sensitivity(self):
-        enabled = bool(self.state.get('installed')) and not self.state.get('update') and not self.busy
+        idle = not self.busy and not self.refreshing
+        enabled = bool(self.state.get('installed')) and not self.state.get('update') and idle
         for control in self.guarded:
             control.set_sensitive(enabled)
-        self.stop_button.set_sensitive(bool(self.state.get('running')) and not self.busy)
-        self.banner.set_sensitive(not self.busy)
-
-    def poll(self):
-        if not self.busy:
-            self.refresh()
-        return True
+        self.stop_button.set_sensitive(bool(self.state.get('running')) and idle)
+        self.banner.set_sensitive(idle)
+        self.check_button.set_sensitive(idle)
 
     def refresh(self):
         # systemctl and file reads run off the GTK event loop.
-        if getattr(self, 'refreshing', False):
+        if self.refreshing or self.busy:
             return
         self.refreshing = True
+        self.check_button.set_label('Checking…')
+        self.banner.set_title('Reading your setup… You can keep browsing.')
+        self.banner.set_button_label('')
+        self.sensitivity()
         def worker():
             try:
                 state, error = self.backend.status(), None
@@ -380,6 +445,7 @@ class Window(Adw.ApplicationWindow):
             GLib.idle_add(done, state, error)
         def done(state, error):
             self.refreshing = False
+            self.check_button.set_label('Check setup')
             if self.busy:
                 return
             self.state = state
@@ -393,7 +459,7 @@ class Window(Adw.ApplicationWindow):
                 self.banner.set_title('Installed · changes are tracked for restoration')
                 self.banner.set_button_label('')
             running = state.get('running')
-            self.status_row.set_title('Keyboard running' if running else 'Keyboard stopped')
+            self.status_row.set_title('Keyboard status unavailable' if error else 'Keyboard running' if running else 'Keyboard stopped')
             self.status_row.set_subtitle('Selected changes need Apply and start.' if running else 'Native key behavior. Nothing starts automatically at login.')
             if running and not state.get('bridge'):
                 self.status_row.set_subtitle('Desktop adapter is unavailable. Stop and restart the keyboard session.')
@@ -409,7 +475,7 @@ class Window(Adw.ApplicationWindow):
                 folder = prefs['wallpaper_folder']
                 if not folder:
                     folder = next((str(p) for p in (Path.home()/'Pictures/Wallpapers', Path.home()/'Downloads/wallpapers', Path.home()/'Downloads/wp') if p.is_dir()), '')
-                self.preview_folder = Path(folder) if folder else None
+                self.preview_folder = self.preview_folder or (Path(folder) if folder else None)
                 self.load_gallery()
                 self.loaded = True
             count = sum('dash-to-dock' in p for p in state.get('appearance', {}))
