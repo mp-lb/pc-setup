@@ -88,9 +88,18 @@ class Dashboard:
         return ('Keyboard stopped and managed appearance restored.' +
                 (' Newer external changes were preserved.' if skipped else ''))
 
-    def uninstall(self):
-        self.install.uninstall()
+    def uninstall(self, audit_export=None):
+        self.install.uninstall(audit_export=audit_export)
         return 'Uninstalled. Keyboard stopped, managed desktop changes restored, owned files removed.'
+
+    def history(self):
+        text = self.install.audit.text()
+        return text or 'No audit history yet. Activity before this version was not logged.'
+
+    def export_history(self, target):
+        with self.install.operation():
+            self.install.audit.export(target)
+        return 'Audit history exported. This copy is yours to keep after uninstall.'
 
     def details(self):
         install = self.install

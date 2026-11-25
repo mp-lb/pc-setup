@@ -32,7 +32,7 @@ ARCHIVES = {
     'x86_64': '61db029d4ee19b9431120ab740574b9b0d2740d9b5b98bbc3375601fdf2687d3',
     'aarch64': 'a0f1cf1428c8a60d95009519cffc2971bbcf695564ea1fcd5e95aa3719dd69b0',
 }
-APP_FILES = ('control.py', 'runtime.py', 'bridge.py', 'profiles.py', 'preferences.py', 'dashboard.py', 'gui.py',
+APP_FILES = ('control.py', 'runtime.py', 'bridge.py', 'profiles.py', 'preferences.py', 'dashboard.py', 'gui.py', 'audit.py',
              'config.json', 'pc.json', 'apple.json', 'xremap', 'XREMAP-LICENSE')
 
 
@@ -118,6 +118,36 @@ class Install:
         from runtime import Runtime
         self.runtime = runtime or Runtime(self.app)
         self.engine = engine
+        from audit import Audit
+        self.audit = Audit(self.record_dir)
+
+    @staticmethod
+    def file_state(path):
+        path = Path(path)
+        if path.is_symlink():
+            return {'symlink': os.readlink(path)}
+        if not path.exists():
+            return None
+        if path.is_dir():
+            return {str(p.relative_to(path)): Install.file_state(p)
+                    for p in sorted(path.iterdir())}
+        return {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                'mode': oct(path.stat().st_mode & 0o777)}
+
+    def session_state(self):
+        if not hasattr(self.runtime, 'state'):  # Injected test runtimes.
+            return {'observation': 'test runtime'}
+        state = {'remapper': self.runtime.state(), 'bridge': self.runtime.state(True)}
+        directory = self.runtime.directory
+        state['runtime_directory'] = str(directory)
+        state['runtime_files'] = {name: self.file_state(directory / name)
+                                  for name in ('active.json', 'preferences.json')}
+        state['socket_exists'] = (directory / 'desktop.sock').exists()
+        return state
+
+    def desktop_change(self, action, requested, write):
+        return self.audit.change(action, 'GNOME extension settings',
+            lambda: {key: self.desktop.read(key) for key in KEYS}, requested, write)
 
     def files(self):
         payload = {}
@@ -238,6 +268,13 @@ class Install:
         return info
 
     def save(self, info):
+        if self.record.exists():
+            return self.audit.change('update ownership record', self.record,
+                                     lambda: json.loads(self.record.read_text()), info,
+                                     lambda: self._save(info))
+        return self._save(info)
+
+    def _save(self, info):
         fd, temp = tempfile.mkstemp(dir=self.record_dir, prefix='.manifest-')
         try:
             with os.fdopen(fd, 'w') as stream:
@@ -266,6 +303,9 @@ class Install:
         self.record_dir.mkdir(parents=True, mode=0o700)
         try:
             self.save(info)
+            self.audit.append('installation baseline', before={'owned_paths': None},
+                              after={'recovery_record': info},
+                              note='Created recovery directory first; no earlier application history exists.')
             staging = self.record_dir / 'staging'
             staging.mkdir()
             for label, content in payload.items():
@@ -285,8 +325,12 @@ class Install:
             for label, target in self.roots.items():
                 if os.path.lexists(target):
                     raise RuntimeError(f'Path appeared during installation: {target}')
-                publish(staging / label, target)
+                self.audit.change('install files', target, lambda p=target: self.file_state(p),
+                                  self.file_state(staging / label),
+                                  lambda: publish(staging / label, target))
             staging.rmdir()
+            self.audit.append('installation completed', created_directories=new_dirs,
+                              owned_files=info['files'])
         except BaseException:
             if not self.record.exists():
                 for temporary in self.record_dir.glob('.manifest-*'):
@@ -324,6 +368,10 @@ class Install:
                 continue
 
     def stop(self):
+        return self.audit.change('stop keyboard session', 'transient services', self.session_state,
+                                 {'services': 'absent', 'runtime_directory': 'absent'}, self._stop)
+
+    def _stop(self):
         self.runtime.stop()
         # Discover live processes rather than trusting a crash-prone PID file.
         # pidfds ensure a recycled PID can never receive our signal.
@@ -348,7 +396,7 @@ class Install:
         if list(self.sessions()):
             raise RuntimeError('A session is still running; installation preserved.')
 
-    def uninstall(self):
+    def uninstall(self, audit_export=None):
         from preferences import FILES, Appearance, validate_state
         if not self.record.exists():
             if any(os.path.lexists(path) for path in (*self.roots.values(), self.record_dir)):
@@ -356,6 +404,12 @@ class Install:
             print('Already uninstalled.')
             return
         info = self.load()
+        if audit_export is not None:
+            target = Path(audit_export).expanduser().absolute()
+            if os.path.lexists(target):
+                raise FileExistsError('Choose a new file for the uninstall history export.')
+            if any(target.resolve().is_relative_to(root.resolve()) for root in (self.app, self.ext, self.record_dir)):
+                raise ValueError('Export history outside the installation directories.')
         for root in (self.app, self.ext, self.record_dir):
             if root.is_symlink():
                 raise RuntimeError(f'Replaced installation directory: {root}')
@@ -363,6 +417,7 @@ class Install:
             self.stop()
             # Hold the same lock the remapper needs before it can grab devices.
             lock = (self.app / 'run.lock').open('a') if self.app.is_dir() else None
+            exported = None
             try:
                 if lock:
                     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -387,11 +442,13 @@ class Install:
                 preserved = Appearance(self.record_dir).restore()
                 if preserved:
                     print('Preserved newer external desktop changes: ' + ', '.join(preserved))
-                self.desktop.disable()
+                self.desktop_change('disable extension', {'extension': 'disabled'}, self.desktop.disable)
                 for key in KEYS:
-                    self.desktop.restore(key, info['desktop'][key])
+                    self.desktop_change('restore extension setting', {key: info['desktop'][key]},
+                                        lambda: self.desktop.restore(key, info['desktop'][key]))
                 for path in expected | runtime:
-                    path.unlink(missing_ok=True)
+                    self.audit.change('remove installed file', path, lambda p=path: self.file_state(p),
+                                      None, lambda: path.unlink(missing_ok=True))
                 for root in (self.app, self.ext):
                     if root.exists():
                         root.rmdir()
@@ -405,6 +462,17 @@ class Install:
                     temporary.unlink()
                 for temporary in self.record_dir.glob('.settings-*'):
                     temporary.unlink()
+                self.audit.append('uninstall cleanup intent',
+                                  before={'recovery_directory': str(self.record_dir), 'created_directories': info['dirs']},
+                                  requested='Remove owned recovery files and empty owned directories.')
+                if audit_export is not None:
+                    target = Path(audit_export).expanduser().absolute()
+                    if any(target.is_relative_to(root) for root in (self.app, self.ext, self.record_dir)):
+                        raise ValueError('Export history outside the installation directories.')
+                    self.audit.export(target)
+                    from audit import Audit
+                    exported = Audit(target.parent)
+                    exported.path = target
                 for name in FILES:
                     (self.record_dir / name).unlink(missing_ok=True)
                 self.record.unlink()
@@ -417,6 +485,16 @@ class Install:
                             path.rmdir()  # Never remove unrelated contents in a shared parent.
                         except OSError:
                             pass
+                if exported:
+                    exported.append('uninstall completed', after={'owned_files': 'removed', 'recovery_directory': 'removed'},
+                                    note='Original managed values restored; newer external settings and unrelated files preserved.')
+            except BaseException as exc:
+                if self.record_dir.exists():
+                    self.audit.append('uninstall failed', error=str(exc),
+                                      note='Recovery record retained; retry after resolving the failure.')
+                if exported:
+                    exported.append('uninstall failed', error=str(exc))
+                raise
             finally:
                 if lock:
                     lock.close()
@@ -433,13 +511,15 @@ class Install:
                 if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
                     raise RuntimeError(f'Installed file differs from the recorded version: {path}')
             self.runtime.ensure_absent()
-            self.desktop.enable()
+            self.desktop_change('enable extension', {'extension': 'enabled'}, self.desktop.enable)
             # Fail before requesting administrator access if GNOME hasn't loaded us.
             self.runtime.context()
             preferences = read_preferences(self.record_dir)
             if apple:
                 preferences['keyboard'] = 'apple'
-            self.runtime.start(preferences['keyboard'] == 'apple', preferences=preferences)
+            self.audit.change('start keyboard session', 'transient services', self.session_state,
+                              {'preferences': preferences, 'services': 'active'},
+                              lambda: self.runtime.start(preferences['keyboard'] == 'apple', preferences=preferences))
         print('Xremap is running in the background. Physical Ctrl+Alt+Esc stops it.')
 
 
@@ -473,7 +553,10 @@ def main():
     parser.add_argument('--notify', action='store_true', help='Show desktop feedback when launched without a terminal.')
     parser.add_argument('--archive', type=Path, help='Use a locally downloaded, checksum-verified Xremap release zip.')
     parser.add_argument('--apple', action='store_true', help='Use the physical Command key on an Apple keyboard.')
+    parser.add_argument('--audit-export', type=Path, help='On uninstall, save history and the final result to a new local file.')
     args = parser.parse_args()
+    if args.audit_export is not None and args.action != 'uninstall':
+        parser.error('--audit-export is only for uninstall')
     if os.geteuid() == 0:
         raise RuntimeError('Run control.py as your normal user. Start/stop request administrator authorization for the transient service.')
     if args.action in ('install', 'start'):
@@ -488,7 +571,7 @@ def main():
             install.stop()
         print('Session stopped.')
     elif args.action == 'uninstall':
-        install.uninstall()
+        install.uninstall(audit_export=args.audit_export)
     elif args.action == 'refresh-launcher':
         install.refresh_launcher()
     else:

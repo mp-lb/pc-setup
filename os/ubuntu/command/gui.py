@@ -344,7 +344,7 @@ class Window(Adw.ApplicationWindow):
         self.action_row(group, 'Restore desktop changes', 'Stops the keyboard session and restores the dock and wallpaper. Keeps the application installed.',
                         'Restore all', lambda: self.confirm('Restore your desktop?', 'Stop keyboard remapping and restore managed appearance settings?', self.backend.restore))
         self.action_row(group, 'Uninstall Gnome MacLike', 'Stops both services, restores managed settings and removes installed files and saved choices. Your wallpaper images stay untouched.',
-                        'Uninstall', lambda: self.confirm('Uninstall Gnome MacLike?', 'Restore managed changes and remove the application? Your source checkout and original image files will remain.', self.backend.uninstall), 'destructive-action')
+                        'Uninstall', self.uninstall_clicked, 'destructive-action')
         page.append(label('Restoration means your values from before this app changed them—not factory defaults. '
                           'If you change a managed appearance setting elsewhere, its newer value is preserved. '
                           'Modified installation files and unknown files block removal instead of being deleted. '
@@ -352,17 +352,21 @@ class Window(Adw.ApplicationWindow):
         group = self.group(page, 'Footprint and recovery record')
         self.action_row(group, 'Inspect the saved record', 'Exact installed paths, original settings and managed appearance values.',
                         'View details', self.show_details, managed=False)
+        self.action_row(group, 'Change history', 'Timestamped intent and observed results, including original and new values. Earlier versions did not record a full history.',
+                        'View history', lambda: self.show_details(history=True), managed=False)
+        self.action_row(group, 'Keep a copy of the history', 'Exports a private local JSON Lines file. Normal uninstall removes the app’s internal log.',
+                        'Export…', self.export_history, managed=False)
         page.append(label('No packages, device-permission rules, startup services or boot settings are installed. '
                           'The remapper runs only after you start it and ends at logout. Closing this window '
                           'does not stop an active keyboard session. Physical Ctrl+Alt+Esc is the emergency stop.', 'dim-label'))
 
-    def show_details(self):
-        dialog = Adw.AlertDialog(heading='Installation and restoration record')
+    def show_details(self, history=False):
+        dialog = Adw.AlertDialog(heading='Change history' if history else 'Installation and restoration record')
         view = Gtk.TextView(editable=False, monospace=True, wrap_mode=Gtk.WrapMode.WORD_CHAR)
         view.get_buffer().set_text('Reading recovery record…')
         def worker():
             try:
-                text = self.backend.details()
+                text = self.backend.history() if history else self.backend.details()
             except Exception as exc:
                 text = str(exc)
             GLib.idle_add(view.get_buffer().set_text, text)
@@ -370,6 +374,35 @@ class Window(Adw.ApplicationWindow):
         scroll = Gtk.ScrolledWindow(child=view, min_content_height=320, min_content_width=560)
         dialog.set_extra_child(scroll)
         dialog.add_response('close', 'Close')
+        dialog.present(self)
+
+    def export_history(self, uninstall=False):
+        chooser = Gtk.FileChooserNative(title='Save uninstall history' if uninstall else 'Export change history',
+                                         transient_for=self, action=Gtk.FileChooserAction.SAVE,
+                                         accept_label='Uninstall and save' if uninstall else 'Export')
+        chooser.set_current_name('maclike-uninstall.jsonl' if uninstall else 'maclike-history.jsonl')
+        def selected(dialog, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                path = Path(dialog.get_file().get_path())
+                action = (lambda: self.backend.uninstall(audit_export=path)) if uninstall else (lambda: self.backend.export_history(path))
+                self.work(action)
+            dialog.destroy()
+        chooser.connect('response', selected)
+        chooser.show()
+
+    def uninstall_clicked(self):
+        dialog = Adw.AlertDialog(heading='Uninstall Gnome MacLike?',
+            body='Restore managed changes and remove installed files, choices and the internal log. You can save a history file that includes the uninstall result.')
+        dialog.add_response('cancel', 'Cancel')
+        dialog.add_response('export', 'Save history and uninstall…')
+        dialog.add_response('remove', 'Uninstall without a copy')
+        dialog.set_response_appearance('remove', Adw.ResponseAppearance.DESTRUCTIVE)
+        def selected(_, response):
+            if response == 'export':
+                self.export_history(uninstall=True)
+            elif response == 'remove':
+                self.work(self.backend.uninstall)
+        dialog.connect('response', selected)
         dialog.present(self)
 
     def confirm(self, title, body, action):

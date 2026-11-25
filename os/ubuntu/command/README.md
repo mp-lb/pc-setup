@@ -34,6 +34,10 @@ checkout, then close and reopen the window. This preserves the running keyboard
 session, saved choices and restoration records. It refuses changes to other app
 modules and records the new GUI checksum for uninstall. Retry the same command
 if interrupted. The GUI does not hot-reload; restarting it does not reset settings.
+Use `python3 -B refresh_gui.py --dashboard` for compatible dashboard/backend
+changes as well. It updates only an explicit set of modules, leaves the remapper,
+mapping configuration and adapter unchanged, and journals each publication so an
+interrupted update can be retried. Saved settings and restoration baselines stay.
 
 The host must already provide Python GObject, GTK 4 and libadwaita 1.5+. No packages
 are installed. Keyboard remapping runs independently of the window: closing the
@@ -103,6 +107,36 @@ Before the first appearance change, the app records each original raw dconf valu
 including whether the key was unset. Restore returns those values, not factory
 defaults. Newer external edits are preserved and reported. The write-ahead journal
 survives partial failures. Restore and uninstall keep it until restoration succeeds.
+
+## Audit and uninstall guarantees
+
+The Restore page exposes the recovery record and a separate timestamped JSON Lines
+history. The history is stored with the owned state as `audit.jsonl` (mode 0600).
+Intent is flushed to disk before each managed setting, choices/recovery-record,
+installed-file, extension or requested service change; an observed result or
+failure follows it. Missing results mean interruption or an unknown outcome.
+Repeated wallpaper/dock changes remain in the history, while the recovery record
+continues to retain the original value. External settings preserved during restore
+are recorded too. The log does not contain keystrokes or image contents.
+
+History begins when this version is installed or upgraded. Previous versions'
+saved baselines can be carried forward; their missing history cannot be recreated.
+The log is local and user-writable, not a tamper-proof forensic record. Service
+exits outside the app (logout, emergency stop, crash) are observed by systemd, not
+continuously monitored by this optional dashboard.
+
+Export a copy from Restore, or choose **Save history and uninstall** to include
+the final uninstall result. Exports must use a new filename. A normal uninstall
+removes the internal history with the rest of the app; an explicitly exported
+copy is yours to keep. The CLI equivalent is
+`python3 -B control.py uninstall --audit-export /path/to/new-history.jsonl`.
+
+The guarantee is restoration of the app's recorded before-state, with newer
+external changes preserved—not a reset of Ubuntu to factory defaults. The app
+owns its files, recovery state, extension and transient services. Shared system
+journals, desktop caches and unrelated personal files are outside its ownership;
+it must not erase those to claim the machine has never run it. Source checkouts
+and explicitly exported history are also intentionally retained.
 
 ## Shortcuts
 

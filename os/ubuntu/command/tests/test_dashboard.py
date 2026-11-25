@@ -181,7 +181,9 @@ class RestorationTests(unittest.TestCase):
         # operation.lock is an intentional lock created by operations, not lost data.
         after = snapshot(self.root)
         for name, content in before.items():
-            self.assertEqual(after[name], content)
+            if not name.endswith('/audit.jsonl'):
+                self.assertEqual(after[name], content)
+        self.assertIn('uninstall failed', (install.record_dir / 'audit.jsonl').read_text())
 
     def test_browsing_gallery_does_not_change_legacy_installation(self):
         runtime = FakeRuntime()

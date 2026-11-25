@@ -7,8 +7,9 @@ import tempfile
 
 from profiles import DEFAULTS, validate
 from runtime import run
+from audit import Audit, NAME as AUDIT_NAME
 
-FILES = ('preferences.json', 'appearance.json')
+FILES = ('preferences.json', 'appearance.json', AUDIT_NAME)
 DOCK = '/org/gnome/shell/extensions/dash-to-dock/'
 BACKGROUND = '/org/gnome/desktop/background/'
 DOCK_PRESET = {'dock-position': "'BOTTOM'", 'extend-height': 'true',
@@ -45,7 +46,13 @@ def read_preferences(directory):
 
 
 def save_preferences(directory, value):
-    write_json(Path(directory) / 'preferences.json', validate(value))
+    audited_json(Path(directory) / 'preferences.json', validate(value))
+
+
+def audited_json(path, value):
+    path = Path(path)
+    return Audit(path.parent).change('write recovery or choices', path,
+        lambda: read_json(path, None), value, lambda: write_json(path, value))
 
 
 class Dconf:
@@ -62,6 +69,11 @@ class Appearance:
     def __init__(self, directory, desktop=None):
         self.path = Path(directory) / 'appearance.json'
         self.desktop = desktop or Dconf()
+        self.audit = Audit(directory)
+
+    def write(self, path, value):
+        self.audit.change('desktop setting', path, lambda: self.desktop.read(path), value,
+                          lambda: self.desktop.write(path, value))
 
     def load(self):
         value = read_json(self.path, {})
@@ -85,8 +97,8 @@ class Appearance:
         for path, after in changes.items():
             before = journal[path]['before'] if path in journal else self.desktop.read(path)
             journal[path] = {'before': before, 'after': after}
-            write_json(self.path, journal)  # Recoverable even if the following write fails.
-            self.desktop.write(path, after)
+            audited_json(self.path, journal)  # Recoverable even if the following write fails.
+            self.write(path, after)
 
     def dock(self):
         # Plain GNOME without Ubuntu Dock is supported without installing extensions.
@@ -112,16 +124,21 @@ class Appearance:
                 continue
             current = self.desktop.read(path)
             if current == entry['after']:
-                self.desktop.write(path, entry['before'])
+                self.write(path, entry['before'])
             elif current != entry['before']:
                 preserved.append(path)  # Leave newer external edits alone.
+                self.audit.append('preserved external change', action='restore', target=path,
+                                  before=current, after=current, original=entry['before'])
             del journal[path]
-            write_json(self.path, journal)
+            audited_json(self.path, journal)
         if not journal:
-            self.path.unlink(missing_ok=True)
+            if self.path.exists():
+                self.audit.change('remove empty recovery record', self.path,
+                    lambda: read_json(self.path, None), None, lambda: self.path.unlink())
         return preserved
 
 
 def validate_state(directory):
     read_preferences(directory)
     Appearance(directory).load()
+    Audit(directory).text()
