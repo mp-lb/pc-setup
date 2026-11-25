@@ -119,6 +119,9 @@ panel preset, and restore/uninstall controls. It uses a pinned Xremap binary for
 macOS-style shortcuts on Ubuntu 26.04 / GNOME 50 Wayland. Its lifecycle is
 Enable, Disable, Doctor and Uninstall: enabling remembers the choice across
 graphical logins; closing the dashboard does not disable it. This optional app
+restores all its managed keyboard, dock and wallpaper settings on Disable, while
+keeping choices for the next Enable. Uninstall also removes its owned integration.
+The app
 is not part of the default bootstrap. The app's own installer owns and audits
 its per-user login integration and narrowly scoped system keyboard service.
 Provisioning/removing that integration requires administrator authorization;
