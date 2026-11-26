@@ -119,6 +119,10 @@ Ubuntu setup also checks for access to an optional private font installer after
 GitHub authentication. Accounts without access silently skip it; no private
 assets or credentials are stored in this public repository.
 
+Ubuntu setup also lets `systemd-oomd` kill the largest swap user when swap is
+nearly full, so memory exhaustion ends one process instead of freezing the
+desktop. See [memory watchdog](docs/memory-watchdog.md).
+
 ## Repository layout
 
 - `start.sh` detects the OS and dispatches to the selected recipe.
