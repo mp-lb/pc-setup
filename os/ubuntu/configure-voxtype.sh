@@ -25,6 +25,9 @@ voxtype --config "$config" config select-model parakeet "$model"
 voxtype --config "$config" config set parakeet.gguf_backend vulkan
 voxtype --config "$config" config set parakeet.threads "$(lscpu -p=CORE,SOCKET | sed '/^#/d' | sort -u | wc -l)"
 voxtype --config "$config" config set text.language en
+# Allow long dictations. Parakeet splits audio past parakeet.max_window_secs
+# (240s by default) into overlapping passes, which keeps VRAM near 2.3GB.
+voxtype --config "$config" config set audio.max_duration_secs 600
 voxtype --config "$config" config set hotkey.enabled false
 voxtype --config "$config" config set output.shift_enter_newlines true
 # GNOME does not implement the Layer Shell protocol used by the waveform OSD.

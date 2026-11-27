@@ -51,7 +51,10 @@ drop-in, and enables the service. Super+/ toggles recording through GNOME,
 with Voxtype's built-in keyboard listener disabled. Both left and right Super
 work because GNOME does not distinguish modifier sides. Existing config is backed up before
 changing the managed settings. It sets English cleanup and Shift+Enter for
-newlines, leaving auto-submit off. `VOXTYPE_MODEL` can select another supported
+newlines, leaving auto-submit off. Recordings may run up to 10 minutes instead
+of the upstream 60-second default. Parakeet's encoder memory grows with the square
+of the audio length (about 2.3GB of VRAM for one 4-minute pass, about 5.5GB for 6
+minutes), so keep the default 240-second `parakeet.max_window_secs` on 8GB GPUs. `VOXTYPE_MODEL` can select another supported
 Parakeet GGUF and `VOXTYPE_SHORTCUT` can change the GNOME accelerator. This is an
 explicit setup utility, never part of bootstrap.
 
