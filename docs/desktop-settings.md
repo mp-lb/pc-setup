@@ -37,8 +37,10 @@ The shared appearance command below does not run this optional step.
 `/org/gnome/`. It records dark mode, the blue accent and matching Yaru themes,
 wallpaper rendering, and the customized dock: a full-width opaque bottom panel,
 centered icons and app-grid button, 24-pixel icons, always visible, on all
-monitors, with no trash icon. Showing the dock on every monitor is a portable
-policy; selecting a particular monitor is not.
+monitors, with no trash icon. Clicking a dock icon focuses the app, minimizes it
+if it is already focused, and spreads its windows when it has several. Showing
+the dock on every monitor is a portable policy; selecting a particular monitor
+is not.
 
 Desktop Icons NG hides its home, trash, mounted-volume, and network-volume icons.
 It remains enabled, so files placed on the desktop can still appear. Its runtime
