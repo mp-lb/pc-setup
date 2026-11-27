@@ -5,10 +5,10 @@ on its own invisible screen, so agents never share tabs and nothing opens,
 takes focus or sends notifications on the desktop.
 
 ```sh
-agent-browser start --name fix-login   # prints the debug port
-agent-browser status fix-login
+agent-browser start                    # prints the browser ID (a UUID) and debug port
+agent-browser status <id>
 agent-browser list [--json]
-agent-browser stop fix-login           # or: stop --all
+agent-browser stop <id>                # or: stop --all
 ```
 
 Agents connect over the Chrome DevTools Protocol on the printed debug port.
