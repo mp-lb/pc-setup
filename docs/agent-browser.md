@@ -7,7 +7,7 @@ takes focus or sends notifications on the desktop.
 ```sh
 agent-browser start                    # prints the browser ID (a UUID) and debug port
 agent-browser status <id>
-agent-browser list [--json]
+agent-browser list [--json]                 # with approximate memory per browser
 agent-browser stop <id>                # or: stop --all
 ```
 
@@ -30,5 +30,5 @@ see it directly.
 
 ## Watching
 
-The cpanel project's Browsers tab lists the running browsers. It can watch a
-browser's screen live, take control of it and stop it.
+The cpanel project's Browsers tab lists the running browsers with their memory. It can watch a
+browser's screen live, take control of it, and stop browsers one at a time, in bulk or all at once.

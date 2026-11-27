@@ -208,6 +208,19 @@ status() {
   fi
 }
 
+# Memory of a browser's whole process group in MB. PSS splits shared pages
+# between processes, so the sum isn't inflated like RSS would be.
+memory_mb() {
+  local pgid pid kb=0 pss
+  pgid="$(read_field "$1" pgid)"
+  [ -n "$pgid" ] || { echo 0; return 0; }
+  for pid in $(pgrep -g "$pgid" 2>/dev/null || true); do
+    pss="$(awk '/^Pss:/ {print $2}' "/proc/$pid/smaps_rollup" 2>/dev/null || true)"
+    kb=$((kb + ${pss:-0}))
+  done
+  echo $((kb / 1024))
+}
+
 json_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
 
 list() {
@@ -217,22 +230,23 @@ list() {
   [ "$json" = 1 ] && printf '['
   for id in $(ids); do
     alive "$id" || continue
-    local port size visible started socket
+    local port size visible started socket memory
     port="$(read_field "$id" port)"
     size="$(read_field "$id" size)"
     visible="$(read_field "$id" visible)"
     started="$(read_field "$id" started)"
     socket="$(read_field "$id" socket)"
+    memory="$(memory_mb "$id")"
     if [ "$json" = 1 ]; then
       [ "$first" = 1 ] || printf ','
       first=0
-      printf '{"id":%s,"debugPort":%s,"size":%s,"visible":%s,"startedAt":%s,"vncSocket":%s}' \
+      printf '{"id":%s,"debugPort":%s,"size":%s,"visible":%s,"startedAt":%s,"vncSocket":%s,"memoryMb":%s}' \
         "$(json_str "$id")" "${port:-null}" "$(json_str "$size")" \
         "$([ "$visible" = 1 ] && echo true || echo false)" "${started:-null}" \
-        "$([ -n "$socket" ] && json_str "$socket" || echo null)"
+        "$([ -n "$socket" ] && json_str "$socket" || echo null)" "$memory"
     else
-      printf '%s\tport %s\tstarted %s\n' "$id" "${port:-?}" \
-        "$(date -d "@$started" '+%H:%M' 2>/dev/null || echo '?')"
+      printf '%s\tport %s\tstarted %s\t%s MB\n' "$id" "${port:-?}" \
+        "$(date -d "@$started" '+%H:%M' 2>/dev/null || echo '?')" "$memory"
     fi
   done
   [ "$json" = 1 ] && printf ']\n'
