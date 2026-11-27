@@ -59,8 +59,15 @@ Parakeet GGUF and `VOXTYPE_SHORTCUT` can change the GNOME accelerator. This is a
 explicit setup utility, never part of bootstrap.
 
 GNOME does not implement the Layer Shell protocol used by the waveform OSD.
-The utility disables that overlay and enables recording start/stop desktop
-notifications instead.
+The utility disables that overlay and the recording desktop notifications, and
+installs the `voxtype-bubble@mp-lb.dev` GNOME Shell extension from
+`artifacts/gnome-shell/` instead. While Voxtype records or transcribes, it shows
+a bubble at the bottom centre of the current monitor with a live level meter
+and a stop button (`voxtype record stop`). It reads only Voxtype's public
+runtime files, `$XDG_RUNTIME_DIR/voxtype/state` and `audio.sock`. GNOME on
+Wayland loads a newly installed extension after the next login. The extension
+declares only the GNOME Shell version it was tested on; check it after a GNOME
+upgrade.
 
 This setup does not require the `input` group. If that group was added solely
 for a previous built-in hotkey setup, remove it with
@@ -69,7 +76,9 @@ already acquired that membership.
 
 To undo automatic startup, run `systemctl --user disable --now voxtype`. Remove
 `~/.config/systemd/user/voxtype.service.d/pc-setup-gpu.conf`, then restore the
-saved config if one existed. Remove the Voxtype shortcut in GNOME Settings.
+saved config if one existed. Remove the Voxtype shortcut in GNOME Settings. Disable the bubble with
+`gnome-extensions disable voxtype-bubble@mp-lb.dev` and delete its folder under
+`~/.local/share/gnome-shell/extensions/`.
 Model files remain available for reuse.
 
 References: [release](https://github.com/peteonrails/voxtype/releases/tag/v1.3.1),

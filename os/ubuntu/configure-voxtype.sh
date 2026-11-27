@@ -31,9 +31,10 @@ voxtype --config "$config" config set audio.max_duration_secs 600
 voxtype --config "$config" config set hotkey.enabled false
 voxtype --config "$config" config set output.shift_enter_newlines true
 # GNOME does not implement the Layer Shell protocol used by the waveform OSD.
+# The Voxtype bubble extension installed below shows recording state instead.
 voxtype --config "$config" config set osd.enabled false
-voxtype --config "$config" config set output.notification.on_recording_start true
-voxtype --config "$config" config set output.notification.on_recording_stop true
+voxtype --config "$config" config set output.notification.on_recording_start false
+voxtype --config "$config" config set output.notification.on_recording_stop false
 voxtype --config "$config" config validate-selection
 
 # Preserve unrelated custom shortcuts. GNOME treats both Super keys alike.
@@ -58,6 +59,24 @@ if path not in paths:
 root.set_strv('custom-keybindings', paths)
 Gio.Settings.sync()
 PY
+
+# Recording bubble with a level meter and stop button, drawn by GNOME Shell.
+extension=voxtype-bubble@mp-lb.dev
+extension_source="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/artifacts/gnome-shell/$extension"
+extension_target="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$extension"
+mkdir -p "$extension_target"
+cp -- "$extension_source"/{metadata.json,extension.js,stylesheet.css} "$extension_target/"
+/usr/bin/python3 - "$extension" <<'PY'
+import sys
+from gi.repository import Gio
+settings = Gio.Settings.new('org.gnome.shell')
+enabled = list(settings.get_strv('enabled-extensions'))
+if sys.argv[1] not in enabled:
+    settings.set_strv('enabled-extensions', enabled + [sys.argv[1]])
+Gio.Settings.sync()
+PY
+gnome-extensions enable "$extension" 2>/dev/null ||
+  echo 'Log out and back in to load the Voxtype bubble extension.'
 
 mkdir -p "$config_root/systemd/user/voxtype.service.d"
 cat > "$config_root/systemd/user/voxtype.service.d/pc-setup-gpu.conf" <<'UNIT'

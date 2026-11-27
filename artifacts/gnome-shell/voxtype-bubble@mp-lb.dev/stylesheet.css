@@ -1,0 +1,42 @@
+.voxtype-bubble {
+  background-color: rgba(24, 24, 27, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  padding: 6px 6px 6px 14px;
+  spacing: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.voxtype-bubble-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #ff453a;
+}
+
+.voxtype-bubble:transcribing .voxtype-bubble-dot {
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+.voxtype-bubble-meter {
+  width: 128px;
+  height: 26px;
+}
+
+.voxtype-bubble-stop {
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+.voxtype-bubble-stop:hover {
+  background-color: rgba(255, 69, 58, 0.85);
+}
+
+.voxtype-bubble-stop-square {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
