@@ -6,6 +6,7 @@ git
 gnupg
 lsof
 shellcheck
+tigervnc-standalone-server
 tmux
 tree
 zsh

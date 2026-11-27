@@ -1,0 +1,258 @@
+#!/usr/bin/env bash
+# Agent browsers: one private Chromium per agent, each on its own invisible
+# screen, so agents never share tabs and nothing pops up on the desktop.
+#
+#   agent-browser start [--name NAME] [--size 1920x1080] [--visible] [-- CHROMIUM_ARGS...]
+#   agent-browser stop NAME | --all
+#   agent-browser status NAME
+#   agent-browser list [--json]
+#
+# Each browser gets a fresh profile, deleted on stop. The screen can be watched
+# over VNC through a private Unix socket (no network port); cPanel shows it.
+# --visible opens a normal window on the desktop instead (no VNC).
+# Browsers older than AGENT_BROWSER_MAX_AGE_HOURS (default 12) are stopped
+# automatically, as are leftovers of crashed browsers.
+set -euo pipefail
+
+DATA_ROOT="${AGENT_BROWSER_HOME:-$HOME/snap/chromium/common/agent-browser}"
+RUN_ROOT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agent-browser"
+MAX_AGE_HOURS="${AGENT_BROWSER_MAX_AGE_HOURS:-12}"
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+
+die() { echo "$*" >&2; exit 1; }
+usage() { sed -n '2,15s/^# \{0,1\}//p' "$SELF"; }
+
+instance_dir() { echo "$DATA_ROOT/$1"; }
+socket_path() { echo "$RUN_ROOT/$1.sock"; }
+read_field() {
+  local file
+  file="$(instance_dir "$1")/instance.env"
+  [ -f "$file" ] || return 0
+  sed -n "s/^$2=//p" "$file" | head -n1
+}
+
+valid_name() { [[ "$1" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; }
+
+# The supervisor leads its own process group; the browser is alive while it is.
+alive() {
+  local pgid
+  pgid="$(read_field "$1" pgid)"
+  [ -n "$pgid" ] && kill -0 "$pgid" 2>/dev/null \
+    && [ "$(ps -o pgid= -p "$pgid" 2>/dev/null | tr -d ' ')" = "$pgid" ]
+}
+
+port_up() { curl -s --max-time 1 "http://127.0.0.1:$1/json/version" >/dev/null; }
+
+# Stops the process group (if any) and removes all files of an instance.
+destroy() {
+  local name="$1" pgid
+  pgid="$(read_field "$name" pgid)"
+  if [ -n "$pgid" ] && pgrep -g "$pgid" >/dev/null 2>&1; then
+    kill -TERM -- "-$pgid" 2>/dev/null || true
+    for _ in $(seq 1 40); do
+      pgrep -g "$pgid" >/dev/null 2>&1 || break
+      sleep 0.25
+    done
+    kill -KILL -- "-$pgid" 2>/dev/null || true
+  fi
+  rm -rf -- "$(instance_dir "$name")" "$(socket_path "$name")"
+}
+
+names() {
+  [ -d "$DATA_ROOT" ] || return 0
+  local d
+  for d in "$DATA_ROOT"/*/; do
+    [ -d "$d" ] && basename "$d"
+  done
+  return 0
+}
+
+# Removes leftovers of dead browsers and stops ones past the age limit.
+gc() {
+  local name started now
+  now="$(date +%s)"
+  for name in $(names); do
+    if ! alive "$name"; then
+      # Give a browser that is still starting a minute before treating it as dead.
+      started="$(read_field "$name" started)"
+      if [ -z "$started" ] || [ $((now - started)) -gt 60 ]; then destroy "$name"; fi
+      continue
+    fi
+    started="$(read_field "$name" started)"
+    if [ -n "$started" ] && [ $((now - started)) -gt $((MAX_AGE_HOURS * 3600)) ]; then
+      destroy "$name"
+    fi
+  done
+}
+
+# Runs in its own process group: the screen, then Chromium in the foreground.
+# Everything in the group is stopped together.
+run() {
+  local name="$1" size="$2" visible="$3"; shift 3
+  local dir display="" xpid=""
+  dir="$(instance_dir "$name")"
+  RUN_SOCKET="$(socket_path "$name")"
+  local sock="$RUN_SOCKET"
+
+  # However this ends (stop, crash, Chromium closed), take the whole group down.
+  trap 'rm -f -- "$RUN_SOCKET"; trap - TERM; kill -TERM 0 2>/dev/null' EXIT
+  trap 'exit 0' TERM INT
+
+  if [ "$visible" = 0 ]; then
+    Xvnc -displayfd 3 -geometry "$size" -depth 24 \
+      -SecurityTypes None -rfbport -1 -rfbunixpath "$sock" -rfbunixmode 0600 \
+      -nolisten tcp -AlwaysShared -AcceptSetDesktopSize=0 \
+      3>"$dir/display" >"$dir/screen.log" 2>&1 </dev/null &
+    xpid=$!
+    for _ in $(seq 1 40); do
+      display="$(tr -dc '0-9' <"$dir/display" 2>/dev/null || true)"
+      [ -n "$display" ] && [ -S "$sock" ] && break
+      kill -0 "$xpid" 2>/dev/null || exit 1
+      sleep 0.25
+    done
+    [ -n "$display" ] || exit 1
+    echo "display=$display" >>"$dir/instance.env"
+    echo "socket=$sock" >>"$dir/instance.env"
+    unset WAYLAND_DISPLAY
+    export DISPLAY=":$display"
+    set -- --ozone-platform=x11 "$@"
+  fi
+
+  chromium \
+    --user-data-dir="$dir/profile" \
+    --remote-debugging-port=0 \
+    --no-first-run --no-default-browser-check \
+    --password-store=basic \
+    --window-size="${size/x/,}" --window-position=0,0 \
+    "$@" >"$dir/browser.log" 2>&1 </dev/null &
+  wait $!
+}
+
+start() {
+  local name="" size=1920x1080 visible=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --name) name="${2:?--name needs a value}"; shift 2 ;;
+      --name=*) name="${1#--name=}"; shift ;;
+      --size) size="${2:?--size needs WIDTHxHEIGHT}"; shift 2 ;;
+      --size=*) size="${1#--size=}"; shift ;;
+      --visible) visible=1; shift ;;
+      --) shift; break ;;
+      *) die "Unknown option: $1 (use -- before Chromium arguments)" ;;
+    esac
+  done
+  [[ "$size" =~ ^[0-9]+x[0-9]+$ ]] || die "--size must look like 1920x1080"
+  [ -n "$name" ] || name="browser-$(head -c2 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  valid_name "$name" || die "Name must be lowercase letters, digits and dashes (max 40)"
+  [ "$visible" = 1 ] || command -v Xvnc >/dev/null \
+    || die "Xvnc is missing. Install it with: sudo apt-get install tigervnc-standalone-server"
+
+  gc
+  if alive "$name"; then
+    echo "Browser $name running, debug port is $(read_field "$name" port)"
+    return 0
+  fi
+  destroy "$name"
+
+  local dir
+  dir="$(instance_dir "$name")"
+  mkdir -p "$dir/profile"
+  mkdir -p "$RUN_ROOT"
+  chmod 700 "$RUN_ROOT"
+  {
+    echo "name=$name"
+    echo "size=$size"
+    echo "visible=$visible"
+    echo "started=$(date +%s)"
+  } >"$dir/instance.env"
+
+  setsid "$SELF" _run "$name" "$size" "$visible" "$@" </dev/null >/dev/null 2>&1 &
+  echo "pgid=$!" >>"$dir/instance.env"
+
+  local port=""
+  for _ in $(seq 1 60); do
+    port="$(head -n1 "$dir/profile/DevToolsActivePort" 2>/dev/null || true)"
+    if [ -n "$port" ] && port_up "$port"; then
+      echo "port=$port" >>"$dir/instance.env"
+      echo "Browser $name running, debug port is $port"
+      echo "Stop it when done: agent-browser stop $name"
+      return 0
+    fi
+    alive "$name" || break
+    sleep 0.25
+  done
+  local logs
+  logs="$(tail -n 5 "$dir/screen.log" "$dir/browser.log" 2>/dev/null || true)"
+  destroy "$name"
+  die "Browser $name didn't start within 15s. Last log lines:
+$logs"
+}
+
+stop() {
+  [ $# -eq 1 ] || die "Usage: agent-browser stop NAME | --all"
+  local name
+  if [ "$1" = --all ]; then
+    for name in $(names); do destroy "$name"; echo "Browser $name stopped"; done
+    return 0
+  fi
+  valid_name "$1" || die "Invalid name: $1"
+  if [ ! -d "$(instance_dir "$1")" ]; then echo "Browser $1 not running"; return 0; fi
+  destroy "$1"
+  echo "Browser $1 stopped"
+}
+
+status() {
+  if [ $# -ne 1 ] || ! valid_name "$1"; then die "Usage: agent-browser status NAME"; fi
+  if ! alive "$1"; then echo "Browser $1 not running"; return 1; fi
+  local port
+  port="$(read_field "$1" port)"
+  if [ -n "$port" ] && port_up "$port"; then
+    echo "Browser $1 running, debug port is $port"
+  else
+    echo "Browser $1 running, but its debug port isn't responding"
+    return 1
+  fi
+}
+
+json_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+list() {
+  local json=0 name first=1
+  [ "${1:-}" = --json ] && json=1
+  gc
+  [ "$json" = 1 ] && printf '['
+  for name in $(names); do
+    alive "$name" || continue
+    local port size visible started socket
+    port="$(read_field "$name" port)"
+    size="$(read_field "$name" size)"
+    visible="$(read_field "$name" visible)"
+    started="$(read_field "$name" started)"
+    socket="$(read_field "$name" socket)"
+    if [ "$json" = 1 ]; then
+      [ "$first" = 1 ] || printf ','
+      first=0
+      printf '{"name":%s,"debugPort":%s,"size":%s,"visible":%s,"startedAt":%s,"vncSocket":%s}' \
+        "$(json_str "$name")" "${port:-null}" "$(json_str "$size")" \
+        "$([ "$visible" = 1 ] && echo true || echo false)" "${started:-null}" \
+        "$([ -n "$socket" ] && json_str "$socket" || echo null)"
+    else
+      printf '%s\tport %s\tstarted %s\n' "$name" "${port:-?}" \
+        "$(date -d "@$started" '+%H:%M' 2>/dev/null || echo '?')"
+    fi
+  done
+  [ "$json" = 1 ] && printf ']\n'
+  return 0
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  start) start "$@" ;;
+  stop) stop "$@" ;;
+  status) status "$@" ;;
+  list) list "$@" ;;
+  _run) run "$@" ;;
+  -h|--help|help|"") usage ;;
+  *) die "Unknown command: $cmd (see agent-browser --help)" ;;
+esac
