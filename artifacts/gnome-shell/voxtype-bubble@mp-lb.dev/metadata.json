@@ -1,0 +1,7 @@
+{
+  "uuid": "voxtype-bubble@mp-lb.dev",
+  "name": "Voxtype bubble",
+  "description": "Shows a recording bubble with a level meter and stop button while Voxtype dictates.",
+  "shell-version": ["50"],
+  "version": 1
+}

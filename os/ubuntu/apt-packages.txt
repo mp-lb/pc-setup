@@ -5,8 +5,10 @@ gh
 git
 gnupg
 lsof
+python3-nautilus
 shellcheck
 tigervnc-standalone-server
 tmux
 tree
+vim
 zsh

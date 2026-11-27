@@ -6,6 +6,9 @@ Zapper CLIs, and global instructions and skills for Codex and Claude Code. It al
 a shell profile bridge and MAP Lab AWS SSO profiles. On Ubuntu GNOME it also
 applies portable desktop appearance preferences and the bundled wallpaper.
 
+Ubuntu setup includes Vim for terminal editing. Doctor checks that it is available,
+and inventory reports its installed package version.
+
 ## Install
 
 From an existing checkout, run:
@@ -75,6 +78,12 @@ zsh as your login shell. With `ZDOTDIR` set, the bridges go there instead.
 Sign out and back in after installation to pick up the shell change. If you already have an AWS config,
 copy the MAP Lab profiles you need from `env/aws-config` into it.
 
+On Ubuntu, new interactive zsh terminals start in `PC_SETUP_WORKSPACE` (default
+`~/Work`), including windows and tabs that inherit another directory. The
+directory must already exist. Command invocations (`zsh -c`, including `-ic`),
+non-terminal sessions, and macOS keep their starting directory. The existing
+shell bridge applies this preference to new terminals immediately.
+
 ### Non-interactive shells
 
 Zsh reads `.zshenv` for ordinary interactive and non-interactive invocations
@@ -109,6 +118,10 @@ for the scope, exclusions, and how to apply it independently of the bootstrap.
 Ubuntu setup also checks for access to an optional private font installer after
 GitHub authentication. Accounts without access silently skip it; no private
 assets or credentials are stored in this public repository.
+
+Ubuntu setup also lets `systemd-oomd` kill the largest swap user when swap is
+nearly full, so memory exhaustion ends one process instead of freezing the
+desktop. See [memory watchdog](docs/memory-watchdog.md).
 
 ## Repository layout
 

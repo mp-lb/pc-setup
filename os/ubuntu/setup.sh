@@ -22,6 +22,7 @@ sudo apt-get install -y "${packages[@]}"
 
 bash "$PC_SETUP_REPO_PATH/os/ubuntu/install-gcloud.sh"
 bash "$PC_SETUP_REPO_PATH/os/ubuntu/install-docker.sh"
+bash "$PC_SETUP_REPO_PATH/os/ubuntu/configure-memory-watchdog.sh"
 
 export PATH="$HOME/.local/bin:$PATH"
 command -v mise >/dev/null 2>&1 || curl -fsSL https://mise.run | sh
